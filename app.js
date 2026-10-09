@@ -1566,6 +1566,8 @@ p.salutation { font-weight: 700; }
 
 function exportPdf(type) {
     const jobText = jobDesc.value.trim();
+    const parsedContact = parseContact(fields.contact.value);
+    const namePart = (parsedContact.name || '').replace(/[^a-zA-Z]/g, '');
     let bodyHtml, title;
 
     if (type === 'cv') {
@@ -1574,7 +1576,7 @@ function exportPdf(type) {
             return;
         }
         bodyHtml = formatCvHtml(jobText);
-        title = 'CV';
+        title = namePart + 'CV';
     } else {
         const coverText = coverLetterText;
         if (!coverText || !coverText.trim()) {
@@ -1582,7 +1584,7 @@ function exportPdf(type) {
             return;
         }
         bodyHtml = formatCoverHtml(coverText, jobText);
-        title = 'Cover Letter';
+        title = namePart + 'CoverLetter';
     }
 
     const win = window.open('', '_blank');
