@@ -272,6 +272,7 @@ How to behave:
 - Work only from the master CV and current CV. Never invent employers, dates, degrees, metrics or responsibilities, and never add a technology the master CV does not mention or clearly imply. You may reorder, reword, tighten and re-emphasise.
 - The master CV is the single source of truth. Never change the degree name, institution, employer names, job titles, dates or the candidate's real technologies to satisfy a keyword. If a job keyword is not supported by the master CV, leave it out and say so; do not force it in.
 - Only add missing job keywords from the "safe to add" list in APP STATE, and only where the master CV already supports them. Never add anything from the "never add" list, and never claim you changed something you did not change.
+- Never insert the job title or generic role words (software engineering, software engineer, graduate, graduate programme, IT graduate) into an experience or project bullet. Describe each role and project exactly as the master CV describes it and keep real job titles on the role header line only.
 - Write experience bullets as action + what the work does, detects or prevents + method or tooling + outcome, without repeating the same claim twice.
 - Technical Skills are 4 to 5 bullet lines of technologies, languages and tools only, never sentences, job-relevant items first. Soft Skills are 3 short keyword-rich sentences with no near-duplicate ideas. Professional Experience keeps every role with at least one bullet, most relevant first.
 - Keep the whole CV within ${CHAR_LIMIT} characters.
@@ -560,7 +561,7 @@ async function parseCv() {
                 : null;
             let tries = 0;
             while (tries < 3 && activeKeywords && cov.total && cov.matched / cov.total < 0.9 && cov.missing.length) {
-                const correctionPrompt = `Here is my original CV:\n\n${cvText}\n\nHere is the current tailored CV JSON:\n${JSON.stringify(current, null, 2)}\n\nJob Description:\n${jobText}\n\nThese important keywords from the job description are not clearly present yet: ${cov.missing.join(', ')}.\n\nRewrite the CV so it truthfully includes as many of these keywords as my original CV genuinely supports, using the employer's exact wording. Read the original CV carefully and infer equivalent wording: if it shows a university degree or current study, express that as a third level qualification; if it shows a security, IT, support or operations role, that supports security concepts, incident response and troubleshooting. Never invent experience that is not implied by the original CV. Keep every section full and stay under ${CHAR_LIMIT} characters. Return the same JSON structure only.`;
+                const correctionPrompt = `Here is my original CV:\n\n${cvText}\n\nHere is the current tailored CV JSON:\n${JSON.stringify(current, null, 2)}\n\nJob Description:\n${jobText}\n\nThese important keywords from the job description are not clearly present yet: ${cov.missing.join(', ')}.\n\nRewrite the CV so it truthfully includes as many of these keywords as my original CV genuinely supports, using the employer's exact wording. Read the original CV carefully and infer equivalent wording: if it shows a university degree or current study, express that as a third level qualification; if it shows a security, IT, support or operations role, that supports security concepts, incident response and troubleshooting. Never invent experience that is not implied by the original CV. Only add a keyword where the original CV already describes that exact thing, prefer adding it to the skills lines, and never insert the job title or role words like software engineering or graduate into an experience or project bullet or change what the candidate built or did. Keep every section full and stay under ${CHAR_LIMIT} characters. Return the same JSON structure only.`;
                 const corrected = await callDeepSeek(systemPrompt, correctionPrompt, 0.25);
                 fillFields(corrected);
                 enforceCharLimit();
@@ -673,6 +674,19 @@ async function parseCv() {
     }
 }
 
+function scrubRolePhrases() {
+    const rolePhrases = ['software engineering', 'software engineer', 'graduate programme', 'graduate program', 'graduate scheme', 'graduate role', 'it graduate'];
+    for (const key of ['experience', 'projects']) {
+        let v = fields[key].value;
+        for (const p of rolePhrases) {
+            const re = new RegExp('\\s+' + p.split(' ').join('\\s+') + '\\s+', 'gi');
+            v = v.replace(re, ' ');
+        }
+        v = v.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n');
+        fields[key].value = v;
+    }
+}
+
 function pruneSkills() {
     const stop = new Set(['that', 'this', 'with', 'from', 'into', 'through', 'across', 'within', 'your', 'their', 'strong', 'clear', 'good', 'well', 'also', 'such', 'using', 'used', 'able', 'ability', 'skills', 'skill', 'work', 'working', 'level', 'based']);
     const sig = (s) => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !stop.has(w)));
@@ -719,6 +733,7 @@ function pruneSkills() {
 }
 
 function enforceCharLimit() {
+    scrubRolePhrases();
     pruneSkills();
     const trimmable = ['experience', 'projects', 'education', 'techSkills', 'softSkills'];
     const floor = { projects: 2, education: 1, techSkills: 4, softSkills: 3 };
@@ -820,6 +835,7 @@ RULES:
     - ATS-friendly: standard headings, no tables, no graphics, no columns, plain text only.
     - Prioritise the must-have requirements of the job: the job title, the requirements or qualifications bullets, and the first responsibilities. Mirror their exact wording where the candidate's experience truthfully supports it, and lead the CV with the strongest matching evidence. When a job description is provided, tailor the CV to it: reorder and rephrase so the candidate's real experience maps onto what the employer asks for, and surface the most relevant material in the top third of the page. The job description shapes emphasis and ordering; it must never crowd out or replace the candidate's actual content.
     - Never add technologies, tools or responsibilities the master CV does not mention or clearly imply. Relevance and truthfulness matter more than keyword count.
+    - Never insert the job title or generic role words into an experience or project bullet. Words like software engineering, software engineer, graduate, graduate programme or IT graduate must not be stuffed into a sentence about the candidate's actual work, because that changes what the work was. Describe each role and project exactly as the master CV describes it, and keep the real job titles on the role header line only.
     - Place each important keyword in BOTH the relevant skills line AND at least one dated experience or project bullet, because ATS systems reward keywords proven in context, not only listed.
     - Never repeat a keyword more than about four times: keyword stuffing is penalised.
     - Include EVERY relevant role and skill from the source CV. Never drop experience that relates to the target job.
