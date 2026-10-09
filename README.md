@@ -7,13 +7,14 @@ A dark-mode, single-page web app that uses the DeepSeek API to parse your master
 - Master CV box: paste your full resume, AI parses it into structured fields
 - DeepSeek API integration: bring your own key, stored only in your browser
 - Strict template format: contact, education, skills, experience, projects (no profile, no referees)
-- Live preview with job description keyword highlighting
+- Live preview with job description keywords shown in bold
 - Character counter (hard limit: 2,851 characters) and A4 page fit warning
 - Single Match score with an expandable breakdown (keyword match, skills proven in context, job title match, quantified impact, action verbs, structure and contact)
 - Missing keyword warnings: shows job description terms not yet in your CV
-- Auto-tailoring: Parse &amp; Auto-Fill rewrites the CV around the job description and its key terms, keeping every section full, then runs up to two AI correction passes to reach roughly 90 percent keyword coverage where the candidate truthfully supports it
-- Technical Skills shown as 6 to 9 real skills and Soft Skills as 3 to 5, always as actual skills rather than sentences
-- Projects: the single most relevant project from your master CV, with 2 to 3 bullets
+- Auto-tailoring: Parse &amp; Auto-Fill rewrites the CV around the job description and its key terms, keeping every section full, running up to three AI correction passes and then automatically adding any remaining grounded keywords the master CV supports, targeting roughly 90 percent keyword coverage
+- Technical Skills as 5 to 6 bullet lines of technologies and tools (no sentences), and Soft Skills as 3 to 4 short keyword-rich sentences
+- Experience as the centrepiece: every relevant role is kept, with 4 to 6 bullets on the most recent or most relevant role and 2 to 3 on the others
+- Projects: the single most relevant project from your master CV, with 1 to 2 short bullets
 - LinkedIn and GitHub links in the exported CV header are clickable hyperlinks
 - Skills for Applications: dropdown of real skills (no sentences) to copy straight into an ATS or careers site
 - Interview Prep: generates "tell me about yourself", "why this company", role-specific STAR answers, questions to ask the interviewer, and open source talking points where relevant
@@ -80,11 +81,11 @@ Open `index.html` in any modern browser. No build step, no server needed.
 
 4. Click **Parse & Auto-Fill**. The AI extracts your details and fills in all template fields.
 
-5. Edit any field. The preview, character count, keyword match, and Match score update live. Keywords from the job description are highlighted in the preview.
+5. Edit any field. The preview, character count, keyword match, and Match score update live. Job description keywords appear in bold in the preview.
 
 6. Watch the character counter. If you exceed 2,851 characters, you will get a warning. If the CV will not fit on one A4 page, you will get a page warning.
 
-7. Check the **Match** score and the expandable breakdown to see how well your CV matches common ATS criteria. Any missing job description keywords are listed for you.
+7. Check the **Match** score and the expandable breakdown to see how well your CV matches common ATS criteria. Missing keywords the master CV genuinely supports are added automatically; only terms it truly cannot support are listed.
 
 8. A tailored cover letter is generated automatically after Parse &amp; Auto-Fill, naming the company and role. Click **Regenerate Cover Letter** to rewrite it.
 
@@ -105,11 +106,11 @@ There is a single **Match** score, with a breakdown you can expand. It is a clie
 - Action Verbs (10): strong verbs like built, automated, led
 - Structure & Contact (10): standard headings plus completed email, phone and location
 
-Practical targets: 75+ coverage of the job description is strong, and around 75 percent or higher tends to reach a human reviewer. No score guarantees passage through any specific system.
+Practical targets: 75 percent or higher coverage of the job description is strong and tends to reach a human reviewer. No score guarantees passage through any specific system.
 
-Keywords are extracted from the job description with navigation and boilerplate stripped out, and phrases are only formed within a sentence so you do not get junk terms. Any important terms missing from your CV are listed under the preview so you can work them in.
+Keywords are extracted from the job description with navigation and boilerplate stripped out, and phrases are only formed within a sentence so you do not get junk terms. Missing terms the master CV supports are woven in automatically; only genuinely unsupported terms are listed under the preview.
 
-The AI also tailors automatically: when a job description is present, **Parse & Auto-Fill** reads it directly, weaves its exact keywords into your skills and bullets, keeps PROFESSIONAL EXPERIENCE strong, aims close to the full 2,851 character budget, and runs up to two correction passes until roughly 90 percent of the key terms are present. It never invents experience, and if the role is unrelated to your master CV the coverage will naturally be lower.
+The AI also tailors automatically: when a job description is present, **Parse & Auto-Fill** reads it directly, weaves its exact keywords into your skills and bullets, keeps PROFESSIONAL EXPERIENCE the centrepiece, aims close to the full 2,851 character budget, and runs up to three correction passes and then auto-adds any remaining grounded keywords, until roughly 90 percent of the key terms are present. It never invents experience, and if the role is unrelated to your master CV the coverage will naturally be lower.
 
 ## Template Format
 
@@ -129,18 +130,15 @@ Years, Location
 
 ## SKILLS
 Technical Skills
-- Security & Forensics: ...
-- Monitoring & SIEM: ...
-- Networking: ...
-- Systems: ...
-- Programming/Scripting: ...
-- Cloud & DevOps: ...
-- Other Tools: ...
+- Cloud & DevOps: AWS, Docker, Kubernetes
+- Networking: TCP/IP, DNS, VPNs
+- Programming: Python, Java, TypeScript
+- Systems & Monitoring: Linux, Windows
+- Security & Forensics: Incident Response, IAM
 
 Soft Skills
-- Communication
-- Teamwork
-- Problem Solving
+- Strong communication skills built through cross-team collaboration.
+- Analytical problem solving applied to live incidents.
 
 ## PROFESSIONAL EXPERIENCE
 Job Title, Company
@@ -148,12 +146,12 @@ Dates, Location
 - Bullet 1
 - Bullet 2
 - Bullet 3
+- Bullet 4
 
 ## PROJECTS
 Most relevant Project Name (Tech Stack)
-- What it does and its outcome
-- Key feature
-- Impact
+- One short sentence on what it does and its outcome
+- One short sentence on the key feature or impact
 ```
 
 ## API Key Security
