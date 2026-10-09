@@ -94,7 +94,7 @@ assert.ok(appJs.includes('boldKeywords'), 'keyword bolding missing');
 assert.ok(appJs.includes('extractJobKeywords'), 'job keyword extraction missing');
 
 // make sure tailoring features exist
-assert.ok(appJs.includes('highlightPreview'), 'live preview highlighting missing');
+assert.ok(!appJs.includes('highlightPreview'), 'dead preview highlighting helper should be removed');
 assert.ok(appJs.includes('keywordCoverage'), 'keyword coverage missing');
 assert.ok(appJs.includes('keywordRegex'), 'keyword regex helper missing');
 assert.ok(appJs.includes('navWords'), 'navigation word filtering missing');

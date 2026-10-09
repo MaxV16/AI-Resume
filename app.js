@@ -225,7 +225,7 @@ async function parseCv() {
     loading.style.display = 'flex';
 
     try {
-        const systemPrompt = buildSystemPrompt(false);
+        const systemPrompt = buildSystemPrompt();
         const jobText = jobDesc.value.trim();
         const userPrompt = `Here is my CV:\n\n${cvText}${jobText ? '\n\nJob Description:\n' + jobText : ''}`;
 
@@ -476,7 +476,7 @@ function parseJsonResponse(content) {
     }
 }
 
-function buildSystemPrompt(regen = false) {
+function buildSystemPrompt() {
     return `You are an expert CV writer and ATS optimization specialist. Parse CV data and output it in a strict template format.
 
 RULES:
@@ -499,7 +499,7 @@ RULES:
 - Include EVERY relevant role and skill from the source CV. Never drop experience that relates to the target job.
 - Optimise for a human recruiter too: make every bullet specific, achievement-focused and easy to scan. No generic filler such as hardworking, team player or good communicator.
 - In the EDUCATION section list at most six relevant modules, choosing the ones most relevant to the job description.
-- ${regen ? 'This is a regeneration: add more detail, stronger verbs, and quantified results, and push closer to the character budget.' : 'Extract and structure the CV data.'}
+- Extract and structure the CV data.
 
 OUTPUT FORMAT (JSON):
 {
@@ -825,20 +825,6 @@ function keywordRegex(jobText) {
     if (!keywords.length) return null;
     const pattern = keywords.map(k => escapeRegex(k)).join('|');
     return new RegExp(`\\b(${pattern})\\b`, 'gi');
-}
-
-function highlightPreview(text, jobText) {
-    let result = escapeHtml(text);
-
-    if (jobText && jobText.trim()) {
-        const rx = keywordRegex(jobText);
-        if (rx) result = result.replace(rx, '<mark class="kw">$1</mark>');
-    }
-
-    const metricsPattern = /\b(\d+%|\b\d+\+|\$\d+(?:,\d{3})*(?:\.\d+)?[KMB]?|\b\d+x\b|\b\d+\.\d+%)(?=\s|$|[^\w%])/g;
-    result = result.replace(metricsPattern, '<mark class="metric">$1</mark>');
-
-    return result;
 }
 
 function extractJobTitle(jobText) {
