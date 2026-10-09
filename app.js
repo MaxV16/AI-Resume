@@ -232,38 +232,41 @@ function chatContext() {
     const ats = calculateAtsScore(buildCvText(), jobText);
     const parts = ats.parts.map(p => `${p.label} ${p.points}/${p.max}`).join(', ');
     const iv = interviewData.map(d => d.question).slice(0, 8).join(' | ');
+    const master = masterCv.value.trim();
     return [
-        `Job description:\n${jobText ? jobText.slice(0, 4000) : '(none provided)'}`,
-        `Contact:\n${fields.contact.value}`,
-        `Education:\n${fields.education.value}`,
-        `Technical Skills:\n${fields.techSkills.value}`,
-        `Soft Skills:\n${fields.softSkills.value}`,
-        `Professional Experience:\n${fields.experience.value}`,
-        `Projects:\n${fields.projects.value}`,
-        `Cover letter:\n${coverLetterText || '(not generated yet)'}`,
-        `ATS match: ${ats.score} percent. Breakdown: ${parts}.`,
-        `Interview questions prepared: ${iv || '(none yet)'}`,
+        `Master CV pasted by the user (the source of truth):\n${master ? master.slice(0, 5000) : '(none pasted)'}`,
+        `Target job description:\n${jobText ? jobText.slice(0, 4000) : '(none provided)'}`,
+        `Current Contact:\n${fields.contact.value}`,
+        `Current Education:\n${fields.education.value}`,
+        `Current Technical Skills:\n${fields.techSkills.value}`,
+        `Current Soft Skills:\n${fields.softSkills.value}`,
+        `Current Professional Experience:\n${fields.experience.value}`,
+        `Current Projects:\n${fields.projects.value}`,
+        `Current cover letter:\n${coverLetterText || '(not generated yet)'}`,
+        `Current ATS match: ${ats.score} percent. Breakdown: ${parts}.`,
+        `Interview questions already prepared: ${iv || '(none yet)'}`,
     ].join('\n\n');
 }
 
 function buildChatSystemPrompt() {
-    return `You are the AI assistant built into this resume builder. You can see the user's CV data, job description, cover letter, ATS breakdown and interview questions in the context below, and you can directly change the CV and cover letter when the user asks.
+    return `You are the AI assistant built into this resume builder. The user talks to you in plain English. You can answer questions AND you can directly edit the CV for them. You have full visibility of their CV, the master CV they pasted, the job description, the cover letter and the ATS score, all listed under APP STATE at the end.
 
-Return ONLY valid JSON, no markdown and no code fences, in this shape:
-{"reply":"...","updates":{},"coverLetter":"","action":"none"}
+You MUST reply with a single JSON object and nothing else. Shape:
+{"reply":"your message to the user","updates":{"contact":"","education":"","techSkills":"","softSkills":"","experience":"","projects":""},"coverLetter":"","action":"none"}
 
-Rules:
-- "reply" is always present: your natural-language answer or a short note on what you changed.
-- Put a field in "updates" ONLY if the user asked you to change it, and always give the FULL new text for that field, not a diff. Allowed keys: contact, education, techSkills, softSkills, experience, projects. Omit any field you are not changing.
-- Technical Skills are 4 to 5 bullet lines of technologies, languages and tools only, never sentences. Soft Skills are 3 short keyword-rich sentences. Professional Experience must keep every role with at least one bullet, most recent first.
-- Never invent employers, dates, degrees, metrics or responsibilities. You may reorder, reword, tighten and re-emphasise, and you may use wording the existing CV clearly supports.
+How to behave:
+- To change the CV, put the FULL new text of each changed field inside "updates" (allowed keys: contact, education, techSkills, softSkills, experience, projects). Never return a partial diff. If you are not changing a field, leave it out of "updates" entirely.
+- If the user asks for something, actually do it in "updates". Do not just describe the change.
+- "reply" is your plain-language answer or a one-line summary of what you changed. Always present.
+- "coverLetter": put the full cover letter text here when the user asks you to write or change the cover letter, otherwise leave it "".
+- "action": "regenerateCover" to produce a fresh tailored cover letter, "generateInterview" to produce interview questions and STAR answers, or "none".
+- Work only from the master CV and current CV. Never invent employers, dates, degrees, metrics or responsibilities. You may reorder, reword, tighten and re-emphasise.
+- Technical Skills are 4 to 5 bullet lines of technologies, languages and tools only, never sentences. Soft Skills are 3 short keyword-rich sentences. Professional Experience keeps every role with at least one bullet, most recent first.
 - Keep the whole CV within ${CHAR_LIMIT} characters.
-- "coverLetter" is included only when the user asks you to write or change the cover letter; otherwise leave it as an empty string.
-- "action" is "none" unless the user asks for it, in which case use "regenerateCover" to write a fresh tailored cover letter or "generateInterview" to create interview questions and STAR answers.
 - Never use em dashes; use hyphens or commas instead.
 - Be concise and practical.
 
-Current app state:
+APP STATE:
 ${chatContext()}`;
 }
 
@@ -275,35 +278,71 @@ function appendChat(role, text) {
     chatLog.scrollTop = chatLog.scrollHeight;
 }
 
+const CHAT_FIELDS = ['contact', 'education', 'techSkills', 'softSkills', 'experience', 'projects'];
+const CHAT_FIELD_ALIASES = {
+    contact: 'contact', contactdetails: 'contact', contactinfo: 'contact',
+    education: 'education', qualifications: 'education',
+    technicalskills: 'techSkills', techskills: 'techSkills', tech: 'techSkills', technical: 'techSkills', skills: 'techSkills',
+    softskills: 'softSkills', soft: 'softSkills',
+    experience: 'experience', professionalexperience: 'experience', workexperience: 'experience', employment: 'experience',
+    projects: 'projects', project: 'projects', projectexperience: 'projects',
+};
+
+function normalizeChatFields(source) {
+    const out = {};
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return out;
+    Object.keys(source).forEach(rawKey => {
+        if (CHAT_FIELDS.includes(rawKey)) {
+            if (typeof source[rawKey] === 'string' && source[rawKey].trim()) out[rawKey] = source[rawKey].trim();
+            return;
+        }
+        const norm = String(rawKey).replace(/[^a-zA-Z]/g, '').toLowerCase();
+        const target = CHAT_FIELD_ALIASES[norm];
+        if (target && typeof source[rawKey] === 'string' && source[rawKey].trim()) out[target] = source[rawKey].trim();
+    });
+    return out;
+}
+
 function applyChatUpdates(result) {
     if (!result || typeof result !== 'object') return false;
     let changed = false;
-    const updates = result.updates;
-    if (updates && typeof updates === 'object') {
-        ['contact', 'education', 'techSkills', 'softSkills', 'experience', 'projects'].forEach(key => {
-            if (typeof updates[key] === 'string' && updates[key].trim()) {
-                fields[key].value = updates[key].trim();
-                changed = true;
-            }
-        });
-        if (Array.isArray(updates.keywords)) {
-            const kws = updates.keywords.map(k => String(k).toLowerCase().trim()).filter(Boolean);
-            if (kws.length) activeKeywords = kws;
+
+    const merged = {};
+    Object.assign(merged, normalizeChatFields(result.updates));
+    Object.assign(merged, normalizeChatFields(result.cv));
+    Object.assign(merged, normalizeChatFields(result.fields));
+    Object.assign(merged, normalizeChatFields(result));
+    Object.keys(merged).forEach(key => {
+        if (fields[key]) {
+            fields[key].value = merged[key];
+            changed = true;
         }
-        if (typeof updates.company === 'string' && updates.company.trim()) {
-            parsedData = parsedData || {};
-            parsedData.company = updates.company.trim();
-        }
-        if (typeof updates.jobTitle === 'string' && updates.jobTitle.trim()) {
-            activeJobTitle = updates.jobTitle.trim();
-            parsedData = parsedData || {};
-            parsedData.jobTitle = updates.jobTitle.trim();
-        }
+    });
+
+    const meta = (result.updates && typeof result.updates === 'object') ? result.updates : result;
+    if (Array.isArray(meta.keywords)) {
+        const kws = meta.keywords.map(k => String(k).toLowerCase().trim()).filter(Boolean);
+        if (kws.length) activeKeywords = kws;
     }
-    if (typeof result.coverLetter === 'string' && result.coverLetter.trim()) {
-        coverLetterText = result.coverLetter.trim();
+    if (typeof meta.company === 'string' && meta.company.trim()) {
+        parsedData = parsedData || {};
+        parsedData.company = meta.company.trim();
+    }
+    if (typeof meta.jobTitle === 'string' && meta.jobTitle.trim()) {
+        activeJobTitle = meta.jobTitle.trim();
+        parsedData = parsedData || {};
+        parsedData.jobTitle = meta.jobTitle.trim();
+    }
+
+    let newCover = '';
+    if (typeof result.coverLetter === 'string' && result.coverLetter.trim()) newCover = result.coverLetter.trim();
+    else if (result.updates && typeof result.updates.coverLetter === 'string' && result.updates.coverLetter.trim()) newCover = result.updates.coverLetter.trim();
+    else if (result.cv && typeof result.cv.coverLetter === 'string' && result.cv.coverLetter.trim()) newCover = result.cv.coverLetter.trim();
+    if (newCover) {
+        coverLetterText = newCover;
         changed = true;
     }
+
     return changed;
 }
 
@@ -319,6 +358,7 @@ async function callDeepSeekChat(messages, temperature) {
             messages,
             temperature,
             max_tokens: 4096,
+            response_format: { type: 'json_object' },
         }),
     });
 
@@ -331,6 +371,22 @@ async function callDeepSeekChat(messages, temperature) {
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new Error('Empty response from API');
     return content.trim();
+}
+
+function extractChatJson(content) {
+    if (!content) return { reply: '', action: 'none' };
+    const text = String(content).replace(/```json/gi, '').replace(/```/g, '').trim();
+    try {
+        return JSON.parse(text);
+    } catch (e) {}
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+        try {
+            return JSON.parse(text.slice(start, end + 1));
+        } catch (e) {}
+    }
+    return { reply: text, action: 'none' };
 }
 
 async function sendChat() {
@@ -356,12 +412,7 @@ async function sendChat() {
         ];
         const content = await callDeepSeekChat(messages, 0.4);
 
-        let result;
-        try {
-            result = JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
-        } catch (e) {
-            result = { reply: content, action: 'none' };
-        }
+        const result = extractChatJson(content);
 
         const changed = applyChatUpdates(result);
         if (changed) {
@@ -376,6 +427,15 @@ async function sendChat() {
         appendChat('assistant', shown);
 
         action = (result && typeof result.action === 'string') ? result.action : 'none';
+
+        const lower = text.toLowerCase();
+        if (action === 'none') {
+            if (/\binterview\b/.test(lower) && /(question|prep|prepare|generate|star|answer)/.test(lower)) {
+                action = 'generateInterview';
+            } else if (/cover letter/.test(lower) && /(write|rewrite|regenerate|redo|new|generate|change|update|tailor|shorten|longer)/.test(lower)) {
+                action = 'regenerateCover';
+            }
+        }
     } catch (err) {
         appendChat('assistant', 'Error: ' + err.message);
     } finally {
