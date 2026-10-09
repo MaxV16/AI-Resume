@@ -136,6 +136,16 @@ assert.ok(indexHtml.includes('interview-format'), 'interview format select missi
 assert.ok(indexHtml.includes('interview-answer'), 'interview answer element missing');
 assert.ok(indexHtml.includes('interview-extra'), 'interview extras element missing');
 
+// make sure the ai assistant chat exists
+assert.ok(appJs.includes('sendChat'), 'chat send handler missing');
+assert.ok(appJs.includes('buildChatSystemPrompt'), 'chat system prompt missing');
+assert.ok(appJs.includes('applyChatUpdates'), 'chat update applier missing');
+assert.ok(appJs.includes('callDeepSeekChat'), 'chat api caller missing');
+assert.ok(indexHtml.includes('chat-log'), 'chat log missing');
+assert.ok(indexHtml.includes('chat-input'), 'chat input missing');
+assert.ok(indexHtml.includes('btn-chat-send'), 'chat send button missing');
+assert.ok(indexHtml.includes('data-chat'), 'chat quick prompts missing');
+
 // make sure removed features are gone
 assert.ok(!appJs.includes('parsePlatformData'), 'platform import should be removed');
 assert.ok(!appJs.includes('platformSelect'), 'platform dropdown wiring should be removed');

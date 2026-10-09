@@ -157,6 +157,27 @@ BSc (Hons) Computer Science..."></textarea>
         </div>
     </section>
 
+    <section class="chat-row">
+        <div class="chat-card">
+            <div class="panel-header">
+                <h2>AI Assistant</h2>
+                <p class="hint">Ask a question or tell it what to change. It can see the CV, job description, cover letter and interview data, and can edit the CV for you.</p>
+            </div>
+            <div class="chat-chips">
+                <button class="chip" data-chat="Tighten my experience bullets so they lead with action verbs and outcomes.">Tighten experience</button>
+                <button class="chip" data-chat="Add any relevant missing keywords from the job description into my skills and bullets, truthfully.">Add missing keywords</button>
+                <button class="chip" data-chat="Rewrite my cover letter to be more specific to this company and role.">Rewrite cover letter</button>
+                <button class="chip" data-chat="Generate likely interview questions for this role with STAR answers.">Generate interview questions</button>
+                <button class="chip" data-chat="What is my ATS match score missing, and how can I improve it?">Review my ATS score</button>
+            </div>
+            <div id="chat-log" class="chat-log"></div>
+            <div class="chat-input-row">
+                <textarea id="chat-input" class="chat-input" rows="2" placeholder="e.g. Make my CV more focused on identity and access management and keep it under the character limit."></textarea>
+                <button id="btn-chat-send" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+    </section>
+
     <div id="api-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>Connect DeepSeek API</h3>

@@ -11,6 +11,7 @@ let interviewData = [];
 let interviewAsk = [];
 let interviewOpen = [];
 let isConnected = false;
+let chatHistory = [];
 
 const masterCv = document.getElementById('master-cv');
 const jobDesc = document.getElementById('job-description');
@@ -27,6 +28,9 @@ const btnGenerateInterview = document.getElementById('btn-generate-interview');
 const interviewQuestion = document.getElementById('interview-question');
 const interviewAnswer = document.getElementById('interview-answer');
 const interviewExtra = document.getElementById('interview-extra');
+const chatLog = document.getElementById('chat-log');
+const chatInput = document.getElementById('chat-input');
+const btnChatSend = document.getElementById('btn-chat-send');
 const loadingText = document.getElementById('loading-text');
 const apiModal = document.getElementById('api-modal');
 const apiKeyInput = document.getElementById('api-key-input');
@@ -158,6 +162,20 @@ function init() {
     interviewFormat.addEventListener('change', renderInterviewAnswer);
     interviewQuestion.addEventListener('change', renderInterviewAnswer);
 
+    btnChatSend.addEventListener('click', sendChat);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChat();
+        }
+    });
+    document.querySelectorAll('.chip[data-chat]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chatInput.value = chip.dataset.chat;
+            sendChat();
+        });
+    });
+
     Object.values(fields).forEach(f => {
         f.addEventListener('input', updatePreview);
     });
@@ -207,6 +225,168 @@ async function callDeepSeek(systemPrompt, userPrompt, temperature) {
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new Error('Empty response from API');
     return parseJsonResponse(content);
+}
+
+function chatContext() {
+    const jobText = jobDesc.value.trim();
+    const ats = calculateAtsScore(buildCvText(), jobText);
+    const parts = ats.parts.map(p => `${p.label} ${p.points}/${p.max}`).join(', ');
+    const iv = interviewData.map(d => d.question).slice(0, 8).join(' | ');
+    return [
+        `Job description:\n${jobText ? jobText.slice(0, 4000) : '(none provided)'}`,
+        `Contact:\n${fields.contact.value}`,
+        `Education:\n${fields.education.value}`,
+        `Technical Skills:\n${fields.techSkills.value}`,
+        `Soft Skills:\n${fields.softSkills.value}`,
+        `Professional Experience:\n${fields.experience.value}`,
+        `Projects:\n${fields.projects.value}`,
+        `Cover letter:\n${coverLetterText || '(not generated yet)'}`,
+        `ATS match: ${ats.score} percent. Breakdown: ${parts}.`,
+        `Interview questions prepared: ${iv || '(none yet)'}`,
+    ].join('\n\n');
+}
+
+function buildChatSystemPrompt() {
+    return `You are the AI assistant built into this resume builder. You can see the user's CV data, job description, cover letter, ATS breakdown and interview questions in the context below, and you can directly change the CV and cover letter when the user asks.
+
+Return ONLY valid JSON, no markdown and no code fences, in this shape:
+{"reply":"...","updates":{},"coverLetter":"","action":"none"}
+
+Rules:
+- "reply" is always present: your natural-language answer or a short note on what you changed.
+- Put a field in "updates" ONLY if the user asked you to change it, and always give the FULL new text for that field, not a diff. Allowed keys: contact, education, techSkills, softSkills, experience, projects. Omit any field you are not changing.
+- Technical Skills are 4 to 5 bullet lines of technologies, languages and tools only, never sentences. Soft Skills are 3 short keyword-rich sentences. Professional Experience must keep every role with at least one bullet, most recent first.
+- Never invent employers, dates, degrees, metrics or responsibilities. You may reorder, reword, tighten and re-emphasise, and you may use wording the existing CV clearly supports.
+- Keep the whole CV within ${CHAR_LIMIT} characters.
+- "coverLetter" is included only when the user asks you to write or change the cover letter; otherwise leave it as an empty string.
+- "action" is "none" unless the user asks for it, in which case use "regenerateCover" to write a fresh tailored cover letter or "generateInterview" to create interview questions and STAR answers.
+- Never use em dashes; use hyphens or commas instead.
+- Be concise and practical.
+
+Current app state:
+${chatContext()}`;
+}
+
+function appendChat(role, text) {
+    const div = document.createElement('div');
+    div.className = 'chat-msg ' + role;
+    div.textContent = text;
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function applyChatUpdates(result) {
+    if (!result || typeof result !== 'object') return false;
+    let changed = false;
+    const updates = result.updates;
+    if (updates && typeof updates === 'object') {
+        ['contact', 'education', 'techSkills', 'softSkills', 'experience', 'projects'].forEach(key => {
+            if (typeof updates[key] === 'string' && updates[key].trim()) {
+                fields[key].value = updates[key].trim();
+                changed = true;
+            }
+        });
+        if (Array.isArray(updates.keywords)) {
+            const kws = updates.keywords.map(k => String(k).toLowerCase().trim()).filter(Boolean);
+            if (kws.length) activeKeywords = kws;
+        }
+        if (typeof updates.company === 'string' && updates.company.trim()) {
+            parsedData = parsedData || {};
+            parsedData.company = updates.company.trim();
+        }
+        if (typeof updates.jobTitle === 'string' && updates.jobTitle.trim()) {
+            activeJobTitle = updates.jobTitle.trim();
+            parsedData = parsedData || {};
+            parsedData.jobTitle = updates.jobTitle.trim();
+        }
+    }
+    if (typeof result.coverLetter === 'string' && result.coverLetter.trim()) {
+        coverLetterText = result.coverLetter.trim();
+        changed = true;
+    }
+    return changed;
+}
+
+async function callDeepSeekChat(messages, temperature) {
+    const response = await fetch(DEEPSEEK_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+            model: 'deepseek-chat',
+            messages,
+            temperature,
+            max_tokens: 4096,
+        }),
+    });
+
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error?.message || `API error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('Empty response from API');
+    return content.trim();
+}
+
+async function sendChat() {
+    if (!apiKey) {
+        alert('Please connect your DeepSeek API key first.');
+        btnApi.click();
+        return;
+    }
+
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    appendChat('user', text);
+    chatHistory.push({ role: 'user', content: text });
+    chatInput.value = '';
+    showLoading('Thinking...');
+
+    let action = 'none';
+    try {
+        const messages = [
+            { role: 'system', content: buildChatSystemPrompt() },
+            ...chatHistory.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
+        ];
+        const content = await callDeepSeekChat(messages, 0.4);
+
+        let result;
+        try {
+            result = JSON.parse(content.replace(/```json/g, '').replace(/```/g, '').trim());
+        } catch (e) {
+            result = { reply: content, action: 'none' };
+        }
+
+        const changed = applyChatUpdates(result);
+        if (changed) {
+            enforceCharLimit();
+            updatePreview();
+        }
+
+        const reply = (result && typeof result.reply === 'string' && result.reply.trim()) ? result.reply.trim() : 'Done.';
+        const shown = reply + (changed ? '\n\n(CV updated.)' : '');
+        chatHistory.push({ role: 'assistant', content: shown });
+        if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
+        appendChat('assistant', shown);
+
+        action = (result && typeof result.action === 'string') ? result.action : 'none';
+    } catch (err) {
+        appendChat('assistant', 'Error: ' + err.message);
+    } finally {
+        hideLoading();
+    }
+
+    if (action === 'generateInterview') {
+        generateInterviewQuestions();
+    } else if (action === 'regenerateCover') {
+        generateCoverLetterAI(true);
+    }
 }
 
 async function parseCv() {

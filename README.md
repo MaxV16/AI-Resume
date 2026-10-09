@@ -20,6 +20,7 @@ A dark-mode, single-page web app that uses the DeepSeek API to parse your master
 - Skills for Applications: dropdown of real skills (no sentences) to copy straight into an ATS or careers site
 - Interview Prep: generates "tell me about yourself", "why this company", role-specific STAR answers, questions to ask the interviewer, and open source talking points where relevant
 - AI cover letter: generated automatically after Parse &amp; Auto-Fill, naming the company and role, with a **Regenerate Cover Letter** button
+- AI Assistant chat: talk to the AI in plain English and it answers questions, edits the CV fields directly, rewrites the cover letter, adds missing keywords, and generates interview questions, all with visibility of your CV, job description and ATS score
 - Export CV and cover letter as PDF
 - Dark mode only
 - No em dashes anywhere
@@ -94,7 +95,9 @@ Open `index.html` in any modern browser. No build step, no server needed.
 
 10. Open **Interview Prep**, choose bullet points or a paragraph, and click **Generate Questions** for "tell me about yourself", "why this company", role-specific questions with STAR answers, questions to ask the interviewer, and open source talking points.
 
-11. Click **Export CV as PDF** or **Export Cover Letter as PDF** to save.
+11. Use the **AI Assistant** box at the bottom to ask questions or request changes in plain English (for example "tighten my experience bullets" or "rewrite my cover letter for this company"). It can see your CV, job description, cover letter, ATS breakdown and interview data, and edits the CV fields directly.
+
+12. Click **Export CV as PDF** or **Export Cover Letter as PDF** to save.
 
 ## ATS Match Score
 
