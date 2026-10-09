@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Builder</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <h1>AI Resume Builder</h1>
+            <span class="tagline">Tailored CVs, cover letters and interview prep</span>
+        </div>
+        <div class="header-actions">
+            <button id="btn-api" class="btn btn-secondary">Connect DeepSeek API</button>
+            <span id="api-status" class="api-status">Not connected</span>
+        </div>
+    </header>
+
+    <main>
+        <section class="input-panel">
+            <div class="panel-header">
+                <h2>Master CV</h2>
+                <p class="hint">Paste your full resume below. The AI will parse it and fill in the template fields.</p>
+            </div>
+            <textarea id="master-cv" class="master-cv" placeholder="Paste your full CV here...
+
+Example:
+ALEX MORGAN
+Dublin, Ireland | 087 123 4567
+alex.morgan@example.com
+LinkedIn: https://linkedin.com/in/...
+GitHub: https://github.com/...
+
+EDUCATION
+BSc (Hons) Computer Science..."></textarea>
+
+            <div class="panel-header" style="margin-top: 16px;">
+                <h2>Job Description (optional)</h2>
+                <p class="hint">Paste the job description to tailor your CV and cover letter.</p>
+            </div>
+            <textarea id="job-description" class="job-description" placeholder="Paste the job description here for better tailoring..."></textarea>
+
+            <div class="action-row">
+                <button id="btn-parse" class="btn btn-primary">Parse &amp; Auto-Fill</button>
+            </div>
+        </section>
+
+        <section class="template-panel">
+            <div class="panel-header">
+                <h2>Template Fields</h2>
+                <p class="hint">Edit any field. The preview updates live.</p>
+            </div>
+
+            <div id="template-fields">
+                <div class="field-group">
+                    <label>Contact Details</label>
+                    <textarea id="field-contact" class="template-field" rows="5"></textarea>
+                </div>
+
+                <div class="field-group">
+                    <label>Education</label>
+                    <textarea id="field-education" class="template-field" rows="7"></textarea>
+                </div>
+
+                <div class="field-group">
+                    <label>Technical Skills</label>
+                    <textarea id="field-tech-skills" class="template-field" rows="7"></textarea>
+                </div>
+
+                <div class="field-group">
+                    <label>Soft Skills</label>
+                    <textarea id="field-soft-skills" class="template-field" rows="4"></textarea>
+                </div>
+
+                <div class="field-group">
+                    <label>Professional Experience</label>
+                    <textarea id="field-experience" class="template-field" rows="10"></textarea>
+                </div>
+
+                <div class="field-group">
+                    <label>Projects</label>
+                    <textarea id="field-projects" class="template-field" rows="7"></textarea>
+                </div>
+            </div>
+        </section>
+
+        <section class="preview-panel">
+            <div class="panel-header">
+                <h2>Live Preview</h2>
+                <div class="stats">
+                    <span id="char-count" class="stat">0 / 2851 chars</span>
+                    <span id="page-estimate" class="stat">~0 pages</span>
+                    <span id="ats-score" class="stat">Match: --</span>
+                </div>
+            </div>
+
+            <div id="char-warning" class="warning" style="display: none;">
+                Character limit exceeded! Remove content to stay under 2,851 characters.
+            </div>
+            <div id="page-warning" class="warning" style="display: none;">
+                This may not fit on a single A4 page. Consider trimming content.
+            </div>
+            <div id="missing-warning" class="warning" style="display: none;"></div>
+
+            <div id="ats-breakdown" class="ats-breakdown" style="display: none;"></div>
+
+            <div id="cv-preview" class="cv-preview"></div>
+
+            <div class="panel-header" style="margin-top: 16px;">
+                <h2>Cover Letter Preview</h2>
+            </div>
+            <div id="cover-letter-preview" class="cover-letter-preview"></div>
+
+            <div class="action-row" style="margin-top: 16px;">
+                <button id="btn-regenerate-cover" class="btn btn-secondary" disabled>Regenerate Cover Letter</button>
+                <button id="btn-export-cv" class="btn btn-primary" disabled>Export CV as PDF</button>
+                <button id="btn-export-cover" class="btn btn-primary" disabled>Export Cover Letter as PDF</button>
+            </div>
+        </section>
+    </main>
+
+    <section class="tools-row">
+        <div class="tool-card">
+            <div class="panel-header">
+                <h2>Skills for Applications</h2>
+                <p class="hint">Pick a group and copy the skills straight into an ATS or careers site form.</p>
+            </div>
+            <select id="skills-select" class="tool-select">
+                <option value="">No skills yet</option>
+            </select>
+            <textarea id="skills-copy" class="tool-output" readonly placeholder="Your skills will appear here once the template is filled."></textarea>
+            <button id="btn-copy-skills" class="btn btn-primary" disabled>Copy Skills</button>
+        </div>
+
+        <div class="tool-card">
+            <div class="panel-header">
+                <h2>Interview Prep</h2>
+                <p class="hint">Generate likely questions for this role, answered with the STAR method.</p>
+            </div>
+            <div class="tool-controls">
+                <select id="interview-format" class="tool-select">
+                    <option value="bullets">Bullet points</option>
+                    <option value="paragraph">Paragraph</option>
+                </select>
+                <button id="btn-generate-interview" class="btn btn-primary">Generate Questions</button>
+            </div>
+            <select id="interview-question" class="tool-select" disabled>
+                <option value="">Questions will appear here</option>
+            </select>
+            <div id="interview-answer" class="interview-answer">
+                Paste a job description, then generate to see tailored questions and STAR answers.
+            </div>
+            <div id="interview-extra" class="interview-extra" style="display: none;"></div>
+        </div>
+    </section>
+
+    <div id="api-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Connect DeepSeek API</h3>
+            <p>Enter your DeepSeek API key. It is stored only in your browser's local storage and never sent anywhere except DeepSeek.</p>
+            <input type="password" id="api-key-input" placeholder="sk-..." class="api-key-input">
+            <div id="test-status" class="test-status"></div>
+            <div class="modal-actions">
+                <button id="btn-test-connection" class="btn btn-secondary">Test Connection</button>
+                <button id="btn-save-key" class="btn btn-primary">Save Key</button>
+                <button id="btn-clear-key" class="btn btn-secondary">Clear Key</button>
+                <button id="btn-close-modal" class="btn btn-secondary">Cancel</button>
+            </div>
+            <p class="modal-hint">Get your key at <a href="https://platform.deepseek.com" target="_blank" rel="noopener">platform.deepseek.com</a></p>
+        </div>
+    </div>
+
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p id="loading-text">Parsing your CV...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

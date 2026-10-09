@@ -1,0 +1,8 @@
+node_modules/
+exports/
+*.key
+.env
+.env.local
+.DS_Store
+tests/
+.git/
