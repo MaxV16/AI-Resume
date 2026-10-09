@@ -263,6 +263,20 @@ async function parseCv() {
                 tries++;
             }
 
+            const expBlocks = parseEntryBlocks(fields.experience.value);
+            const emptyRole = expBlocks.some(e => e.bullets.length === 0);
+            if (emptyRole) {
+                const fixPrompt = `Here is my original CV:\n\n${cvText}\n\nHere is the current tailored CV JSON:\n${JSON.stringify(current, null, 2)}\n\nEvery role in the experience section must have bullet points. At least one role currently has none. Add 1 to 2 truthful bullets to each role that is missing them, using only what my original CV states, and keep the rest of the CV unchanged. Return the same JSON structure only.`;
+                try {
+                    const fixed = await callDeepSeek(systemPrompt, fixPrompt, 0.2);
+                    if (fixed && typeof fixed.experience === 'string' && fixed.experience.trim()) {
+                        current = fixed;
+                        fillFields(current);
+                        enforceCharLimit();
+                    }
+                } catch (err) {}
+            }
+
             const masterLower = cvText.toLowerCase();
             const softTerms = ['communication', 'teamwork', 'team player', 'collaborat', 'problem solving', 'problem-solving', 'time management', 'adaptab', 'leadership', 'mentor', 'stakeholder', 'customer', 'presentation', 'professional', 'organis', 'priorit', 'attention to detail', 'multitask', 'orientated', 'oriented', 'curios', 'enthusias', 'willingness', 'eager', 'initiative', 'proactive', 'dependab', 'reliab', 'interpersonal', 'empath', 'resilien', 'flexib', 'approachable', 'motivat', 'integrity', 'accountab', 'creativ', 'negotiat', 'analytical', 'troubleshoot'];
             const addGrounded = () => {
@@ -297,9 +311,6 @@ async function parseCv() {
                         lines[matchIdx] = lines[matchIdx].replace(/\s*$/, '') + ', ' + kw;
                         fields.techSkills.value = lines.join('\n');
                         n++;
-                    } else if (lines.length < 7) {
-                        fields.techSkills.value = lines.concat(kw).join('\n');
-                        n++;
                     }
                 }
                 return n;
@@ -332,7 +343,7 @@ async function parseCv() {
 
 function enforceCharLimit() {
     const trimmable = ['experience', 'projects', 'education', 'techSkills', 'softSkills'];
-    const floor = { projects: 2, education: 1, techSkills: 5, softSkills: 3 };
+    const floor = { projects: 2, education: 1, techSkills: 4, softSkills: 3 };
     const isBullet = (l) => /^\s*[-*•]/.test(l);
 
     const experienceMinBullets = () => {
@@ -406,10 +417,10 @@ RULES:
 - Target the full character budget: aim for 2700 to ${CHAR_LIMIT} characters so the CV fills one A4 page. Only go shorter if the source CV genuinely has little content. Never exceed ${CHAR_LIMIT} characters.
 - There is NO profile, summary, objective or achievements section. Fold the strongest supporting detail from the master CV into the experience, project and skills bullets, and omit anything that does not fit.
 - Never leave a section a single bare line. A near-empty Projects or Skills section is a failure.
-- PROFESSIONAL EXPERIENCE is the centrepiece of the CV and carries the most weight. Include EVERY role from the master CV, most recent first. Rank roles by relevance to the job: give the most relevant or most recent role 4 to 6 bullets, each other clearly relevant role 2 to 3 bullets, and a partly relevant role a compact entry of 1 to 2 bullets. Never drop a role and never let a less relevant role grow large.
+- PROFESSIONAL EXPERIENCE is the centrepiece of the CV and carries the most weight. Include EVERY role from the master CV, most recent first. Rank roles by relevance to the job: give the most relevant or most recent role 4 to 6 bullets, each other clearly relevant role 2 to 3 bullets, and a partly relevant role a compact entry of 1 to 2 bullets. Never drop a role and never let a less relevant role grow large. Every role must have at least one bullet: never output a role with no bullets underneath it.
 - Write every experience bullet as ACTION + SCOPE or CONTEXT + METHOD or TOOLING + OUTCOME, in one or two lines. Lead with a strong action verb. Quantify the outcome only with figures the master CV actually contains; when no figure exists, describe the concrete qualitative impact instead. Never invent metrics, employers, dates, degrees or responsibilities.
-- TECHNICAL SKILLS: output 5 to 6 bullet lines. Each line is technologies, languages, tools or a short category label followed by comma-separated tech, for example Cloud & DevOps: AWS, Docker, Kubernetes. Never write a sentence, trait or soft skill here. Prioritise the skills the target job asks for; you may keep a few strong general skills the candidate clearly has, but omit unrelated ones.
-- SOFT SKILLS: output 3 to 4 bullet lines. Each line is a single short sentence of roughly 8 to 14 words that names the skill and includes the relevant job keywords.
+- TECHNICAL SKILLS: output 4 to 5 bullet lines. Each line is technologies, languages, tools or a short category label followed by comma-separated tech, for example Cloud & DevOps: AWS, Docker, Kubernetes. Never write a sentence, trait or soft skill here. Prioritise the skills the target job asks for; you may keep a few strong general skills the candidate clearly has, but omit unrelated ones. Do not add any line that is not a technology, language or tool.
+- SOFT SKILLS: output 3 bullet lines. Each line is a single short sentence of roughly 8 to 14 words that names the skill and includes the relevant job keywords.
 - PROJECTS: choose the single most relevant project from the master CV for this job. Output its name plus tech stack on the first line, then 1 to 2 short bullets, one short sentence each, covering what the project does and the relevant outcome.
 - Use strong action verbs (built, developed, led, automated, optimized, etc.). Lead every bullet with an action verb and, where the master CV supports a number, a measurable outcome.
 - Quantify achievements where possible (%, numbers, time saved).
@@ -429,8 +440,8 @@ OUTPUT FORMAT (JSON):
     "keywords": ["15 to 25 of the most important ATS keywords from the job description, most important first. Each keyword must be short: 1 to 3 words, never a full sentence or clause. Mix the employer's exact wording with standard synonyms. Only terms the candidate genuinely has or can honestly claim."],
     "contact": "FULL NAME\\nPhone | Email\\nLocation\\nLinkedIn: url | GitHub: url",
     "education": "Degree, Institution\\nYears, Location\\n- Grade: ...\\n- Relevant Modules: ...\\n- Activities: ...",
-    "techSkills": "5 to 6 bullet lines of technologies, languages and tools only, e.g. Cloud & DevOps: AWS, Docker, Kubernetes\\nNetworking: TCP/IP, DNS, VPNs",
-    "softSkills": "3 to 4 bullet lines, each a short sentence of roughly 8 to 14 words, e.g. Strong communication skills built through cross-team collaboration.",
+    "techSkills": "4 to 5 bullet lines of technologies, languages and tools only, e.g. Cloud & DevOps: AWS, Docker, Kubernetes\\nNetworking: TCP/IP, DNS, VPNs",
+    "softSkills": "3 bullet lines, each a short sentence of roughly 8 to 14 words, e.g. Strong communication skills built through cross-team collaboration.",
     "experience": "Job Title, Company\\nDates, Location\\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n- Bullet 4",
     "projects": "Most relevant Project Name (Tech Stack)\\n- One short sentence on what it does and its outcome\\n- One short sentence on the key feature or impact"
 }`;
@@ -1155,7 +1166,7 @@ function escapeHtml(text) {
 }
 
 const PDF_CSS = `
-@page { size: A4; margin: 10mm; }
+@page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
 body {
     font-family: Calibri, 'Segoe UI', Lato, Arial, sans-serif;
@@ -1163,7 +1174,7 @@ body {
     line-height: 1.3;
     color: #1a1a1a;
     margin: 0;
-    padding: 0;
+    padding: 10mm 10mm;
     max-width: 210mm;
 }
 a { color: inherit; text-decoration: none; }

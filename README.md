@@ -12,7 +12,8 @@ A dark-mode, single-page web app that uses the DeepSeek API to parse your master
 - Single Match score with an expandable breakdown (keyword match, skills proven in context, job title match, quantified impact, action verbs, structure and contact)
 - Missing keyword warnings: shows job description terms not yet in your CV
 - Auto-tailoring: Parse &amp; Auto-Fill rewrites the CV around the job description and its key terms, keeping every section full, running up to three AI correction passes and then automatically adding any remaining grounded keywords the master CV supports, targeting roughly 90 percent keyword coverage
-- Technical Skills as 5 to 6 bullet lines of technologies and tools (no sentences), and Soft Skills as 3 to 4 short keyword-rich sentences
+- Technical Skills as 4 to 5 bullet lines of technologies and tools (no sentences), and Soft Skills as 3 short keyword-rich sentences
+- Every role in the experience section always keeps at least one bullet, even when it is only partly relevant
 - Experience as the centrepiece: roles are ranked by relevance, every role is kept (the most relevant with 4 to 6 STAR-style ACTION + METHOD + OUTCOME bullets, other roles 2 to 3, and a partly relevant role a compact 1 to 2 bullet entry)
 - Projects: the single most relevant project from your master CV, with 1 to 2 short bullets
 - LinkedIn and GitHub links in the exported CV header are clickable hyperlinks
