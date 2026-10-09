@@ -1,6 +1,6 @@
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const CHAR_LIMIT = 2851;
-const A4_CHARS_PER_PAGE = 3800;
+const A4_CHARS_PER_PAGE = 3200;
 
 let apiKey = localStorage.getItem('deepseek_api_key') || '';
 let parsedData = null;
@@ -275,12 +275,32 @@ async function parseCv() {
                     if (!parts.length || !parts.some(w => masterLower.includes(w))) continue;
                     const isEdu = /qualification|degree|third level|level \d/.test(kw);
                     const isSoft = softTerms.some(t => kw.includes(t));
-                    const field = isEdu ? fields.education : (isSoft ? fields.softSkills : fields.techSkills);
-                    const cur = field.value.trim();
-                    if (cur.toLowerCase().includes(kw)) continue;
-                    const line = isSoft ? `Skilled in ${kw}.` : kw;
-                    field.value = cur ? cur + '\n' + line : line;
-                    n++;
+                    if (isEdu) {
+                        const cur = fields.education.value.trim();
+                        if (!cur.toLowerCase().includes(kw)) {
+                            fields.education.value = cur ? cur + '\n' + kw : kw;
+                            n++;
+                        }
+                        continue;
+                    }
+                    if (isSoft) {
+                        const cur = fields.softSkills.value.trim();
+                        if (!cur.toLowerCase().includes(kw)) {
+                            fields.softSkills.value = cur ? cur + '\nSkilled in ' + kw + '.' : 'Skilled in ' + kw + '.';
+                            n++;
+                        }
+                        continue;
+                    }
+                    const lines = fields.techSkills.value.split('\n').filter(l => l.trim());
+                    const matchIdx = lines.findIndex(l => l.toLowerCase().split(/[^a-z0-9]+/).some(w => w.length >= 4 && parts.includes(w)));
+                    if (matchIdx >= 0) {
+                        lines[matchIdx] = lines[matchIdx].replace(/\s*$/, '') + ', ' + kw;
+                        fields.techSkills.value = lines.join('\n');
+                        n++;
+                    } else if (lines.length < 7) {
+                        fields.techSkills.value = lines.concat(kw).join('\n');
+                        n++;
+                    }
                 }
                 return n;
             };
@@ -312,23 +332,49 @@ async function parseCv() {
 
 function enforceCharLimit() {
     const trimmable = ['experience', 'projects', 'education', 'techSkills', 'softSkills'];
-    const floor = { experience: 5, projects: 2, education: 1, techSkills: 5, softSkills: 3 };
-    let guard = 0;
+    const floor = { projects: 2, education: 1, techSkills: 5, softSkills: 3 };
+    const isBullet = (l) => /^\s*[-*•]/.test(l);
 
+    const experienceMinBullets = () => {
+        const lines = fields.experience.value.split('\n').filter(l => l.trim());
+        const headers = lines.filter(l => !isBullet(l)).length;
+        const roles = Math.max(1, Math.round(headers / 2));
+        return 1 + roles;
+    };
+
+    let guard = 0;
     while (buildCvText().length > CHAR_LIMIT && guard < 2000) {
         let target = null;
         let largest = 0;
         for (const key of trimmable) {
             const lines = fields[key].value.split('\n').filter(l => l.trim());
-            if (lines.length > (floor[key] || 1) && lines.length >= largest) {
-                largest = lines.length;
+            let removable;
+            let size;
+            if (key === 'experience') {
+                const bullets = lines.filter(isBullet).length;
+                removable = bullets - experienceMinBullets();
+                size = bullets;
+            } else {
+                removable = lines.length - (floor[key] || 1);
+                size = lines.length;
+            }
+            if (removable > 0 && size >= largest) {
+                largest = size;
                 target = key;
             }
         }
         if (!target) break;
-        const lines = fields[target].value.split('\n').filter(l => l.trim());
-        lines.pop();
-        fields[target].value = lines.join('\n');
+        const all = fields[target].value.split('\n').filter(l => l.trim());
+        if (target === 'experience') {
+            let idx = -1;
+            for (let i = 0; i < all.length; i++) {
+                if (isBullet(all[i])) idx = i;
+            }
+            all.splice(idx, 1);
+        } else {
+            all.pop();
+        }
+        fields[target].value = all.join('\n');
         guard++;
     }
 }
@@ -360,11 +406,12 @@ RULES:
 - Target the full character budget: aim for 2700 to ${CHAR_LIMIT} characters so the CV fills one A4 page. Only go shorter if the source CV genuinely has little content. Never exceed ${CHAR_LIMIT} characters.
 - There is NO profile, summary, objective or achievements section. Fold the strongest supporting detail from the master CV into the experience, project and skills bullets, and omit anything that does not fit.
 - Never leave a section a single bare line. A near-empty Projects or Skills section is a failure.
-- PROFESSIONAL EXPERIENCE is the centrepiece of the CV. Include EVERY relevant role from the master CV, most recent first. Give the most relevant or most recent role 4 to 6 bullets and each other relevant role 2 to 3 bullets. Never drop a role that relates to the target job. Experience bullets carry the most weight, so they should be the richest part of the CV.
+- PROFESSIONAL EXPERIENCE is the centrepiece of the CV and carries the most weight. Include EVERY role from the master CV, most recent first. Rank roles by relevance to the job: give the most relevant or most recent role 4 to 6 bullets, each other clearly relevant role 2 to 3 bullets, and a partly relevant role a compact entry of 1 to 2 bullets. Never drop a role and never let a less relevant role grow large.
+- Write every experience bullet as ACTION + SCOPE or CONTEXT + METHOD or TOOLING + OUTCOME, in one or two lines. Lead with a strong action verb. Quantify the outcome only with figures the master CV actually contains; when no figure exists, describe the concrete qualitative impact instead. Never invent metrics, employers, dates, degrees or responsibilities.
 - TECHNICAL SKILLS: output 5 to 6 bullet lines. Each line is technologies, languages, tools or a short category label followed by comma-separated tech, for example Cloud & DevOps: AWS, Docker, Kubernetes. Never write a sentence, trait or soft skill here. Prioritise the skills the target job asks for; you may keep a few strong general skills the candidate clearly has, but omit unrelated ones.
 - SOFT SKILLS: output 3 to 4 bullet lines. Each line is a single short sentence of roughly 8 to 14 words that names the skill and includes the relevant job keywords.
 - PROJECTS: choose the single most relevant project from the master CV for this job. Output its name plus tech stack on the first line, then 1 to 2 short bullets, one short sentence each, covering what the project does and the relevant outcome.
-- Use strong action verbs (built, developed, led, automated, optimized, etc.). Lead every bullet with an action verb plus a measurable outcome.
+- Use strong action verbs (built, developed, led, automated, optimized, etc.). Lead every bullet with an action verb and, where the master CV supports a number, a measurable outcome.
 - Quantify achievements where possible (%, numbers, time saved).
 - ATS-friendly: standard headings, no tables, no graphics, no columns, plain text only.
 - When a job description is provided, tailor the CV to it: reorder and rephrase so the candidate's real experience maps onto what the employer asks for, mirror their exact wording where it truthfully applies, and surface the most relevant material in the top third of the page. The job description shapes emphasis and ordering; it must never crowd out or replace the candidate's actual content.
@@ -1108,58 +1155,58 @@ function escapeHtml(text) {
 }
 
 const PDF_CSS = `
-@page { size: A4; margin: 13mm 15mm; }
+@page { size: A4; margin: 10mm; }
 * { box-sizing: border-box; }
 body {
     font-family: Calibri, 'Segoe UI', Lato, Arial, sans-serif;
-    font-size: 10.5pt;
-    line-height: 1.42;
+    font-size: 10pt;
+    line-height: 1.3;
     color: #1a1a1a;
     margin: 0;
-    padding: 13mm 15mm;
+    padding: 0;
     max-width: 210mm;
 }
 a { color: inherit; text-decoration: none; }
-.cv-header { margin-bottom: 10pt; }
+.cv-header { margin-bottom: 6pt; }
 .cv-header h1 {
-    font-size: 24pt;
+    font-size: 19pt;
     font-weight: 700;
-    margin: 0 0 6pt;
+    margin: 0 0 4pt;
     letter-spacing: -0.3pt;
 }
 .contact-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 5pt 16pt;
-    font-size: 10pt;
+    gap: 3pt 12pt;
+    font-size: 9pt;
     color: #222;
 }
-.contact-row .c-item { display: inline-flex; align-items: center; gap: 5pt; }
+.contact-row .c-item { display: inline-flex; align-items: center; gap: 3pt; }
 .contact-row svg { flex-shrink: 0; }
 h2 {
-    font-size: 12.5pt;
+    font-size: 11.5pt;
     font-weight: 700;
-    margin: 13pt 0 6pt;
-    padding-bottom: 2pt;
-    border-bottom: 1.6pt solid #000;
+    margin: 8pt 0 3pt;
+    padding-bottom: 1.5pt;
+    border-bottom: 1.2pt solid #000;
 }
-h3 { font-size: 10.5pt; font-weight: 700; margin: 0 0 4pt; }
-p { margin: 0 0 3pt; }
-p.bullet { padding-left: 14pt; text-indent: -10pt; }
+h3 { font-size: 10pt; font-weight: 700; margin: 0 0 2pt; }
+p { margin: 0 0 2pt; }
+p.bullet { padding-left: 12pt; text-indent: -9pt; }
 p.meta { color: #333; }
-.skills-grid { display: flex; gap: 22pt; }
+.skills-grid { display: flex; gap: 16pt; }
 .skills-grid > div { flex: 1; }
-    .skill-list { list-style: disc; margin: 0; padding-left: 14pt; }
-.entry { display: flex; gap: 14pt; margin-bottom: 9pt; }
-.entry-dates { flex: 0 0 92pt; font-size: 9.5pt; color: #333; }
+.skill-list { list-style: disc; margin: 0; padding-left: 11pt; }
+.entry { display: flex; gap: 10pt; margin-bottom: 5pt; }
+.entry-dates { flex: 0 0 76pt; font-size: 9pt; color: #333; }
 .entry-body { flex: 1; }
-.entry-title { margin: 0 0 3pt; }
-ul { margin: 0; padding-left: 14pt; }
-li { margin-bottom: 2.5pt; }
+.entry-title { margin: 0 0 2pt; }
+ul { margin: 0; padding-left: 11pt; }
+li { margin-bottom: 1.5pt; }
+p, li { break-inside: avoid; }
 strong { font-weight: 700; }
 em { font-style: italic; }
 p.salutation { font-weight: 700; }
-@media print { body { padding: 0; } }
 `;
 
 function exportPdf(type) {
