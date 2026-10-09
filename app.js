@@ -636,7 +636,53 @@ async function parseCv() {
     }
 }
 
+function pruneSkills() {
+    const stop = new Set(['that', 'this', 'with', 'from', 'into', 'through', 'across', 'within', 'your', 'their', 'strong', 'clear', 'good', 'well', 'also', 'such', 'using', 'used', 'able', 'ability', 'skills', 'skill', 'work', 'working', 'level', 'based']);
+    const sig = (s) => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !stop.has(w)));
+
+    const softLines = fields.softSkills.value.split('\n').map(l => l.trim()).filter(Boolean);
+    const keptSoft = [];
+    const keptWords = [];
+    for (const line of softLines) {
+        const w = sig(line);
+        const dup = keptWords.some(k => {
+            if (!w.size || !k.size) return false;
+            const shared = [...w].filter(x => k.has(x)).length;
+            return shared / Math.min(w.size, k.size) >= 0.6;
+        });
+        if (!dup && keptSoft.length < 4) {
+            keptSoft.push(line);
+            keptWords.push(w);
+        }
+    }
+    fields.softSkills.value = keptSoft.join('\n');
+
+    const techLines = fields.techSkills.value.split('\n').map(l => l.trim()).filter(Boolean);
+    const seen = new Set();
+    const outTech = [];
+    for (const line of techLines) {
+        const colon = line.indexOf(':');
+        let label = '';
+        let body = line;
+        if (colon > 0 && colon < 40) {
+            label = line.slice(0, colon).trim();
+            body = line.slice(colon + 1);
+        }
+        const tokens = body.split(',').map(t => t.trim()).filter(Boolean);
+        const keptTokens = tokens.filter(t => {
+            const key = t.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+        if (label && keptTokens.length) outTech.push(label + ': ' + keptTokens.join(', '));
+        else if (!label && keptTokens.length) outTech.push(keptTokens.join(', '));
+    }
+    fields.techSkills.value = outTech.join('\n');
+}
+
 function enforceCharLimit() {
+    pruneSkills();
     const trimmable = ['experience', 'projects', 'education', 'techSkills', 'softSkills'];
     const floor = { projects: 2, education: 1, techSkills: 4, softSkills: 3 };
     const isBullet = (l) => /^\s*[-*•]/.test(l);
