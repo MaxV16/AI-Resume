@@ -263,18 +263,71 @@ async function parseCv() {
                 tries++;
             }
 
-            const expBlocks = parseEntryBlocks(fields.experience.value);
-            const emptyRole = expBlocks.some(e => e.bullets.length === 0);
-            if (emptyRole) {
-                const fixPrompt = `Here is my original CV:\n\n${cvText}\n\nHere is the current tailored CV JSON:\n${JSON.stringify(current, null, 2)}\n\nEvery role in the experience section must have bullet points. At least one role currently has none. Add 1 to 2 truthful bullets to each role that is missing them, using only what my original CV states, and keep the rest of the CV unchanged. Return the same JSON structure only.`;
+            const roleTitlesWithoutBullets = () => parseEntryBlocks(fields.experience.value).filter(e => e.bullets.length === 0).map(e => e.title);
+            let roleTries = 0;
+            while (roleTries < 2 && roleTitlesWithoutBullets().length) {
+                const missingRoles = roleTitlesWithoutBullets();
+                const fixPrompt = `Here is my original CV:\n\n${cvText}\n\nHere is the current tailored CV JSON:\n${JSON.stringify(current, null, 2)}\n\nEvery role in the experience section must have bullet points. These roles currently have none: ${missingRoles.join('; ')}. Add 1 to 2 truthful bullets to each of those roles using only what my original CV states about that role, and keep the rest of the CV unchanged. Return the same JSON structure only.`;
                 try {
                     const fixed = await callDeepSeek(systemPrompt, fixPrompt, 0.2);
                     if (fixed && typeof fixed.experience === 'string' && fixed.experience.trim()) {
                         current = fixed;
                         fillFields(current);
                         enforceCharLimit();
+                    } else {
+                        break;
                     }
-                } catch (err) {}
+                } catch (err) {
+                    break;
+                }
+                roleTries++;
+            }
+
+            const masterBulletsFor = (title) => {
+                const stop = ['engineer', 'technician', 'intern', 'internship', 'systems', 'system', 'payment', 'payments', 'information', 'services', 'service', 'company', 'analyst', 'associate', 'graduate'];
+                const words = (title.toLowerCase().match(/[a-z]{4,}/g) || []).filter(w => !stop.includes(w));
+                const lines = cvText.split('\n').map(l => l.trim()).filter(Boolean);
+                let bestStart = -1;
+                let bestScore = 0;
+                for (let i = 0; i < lines.length; i++) {
+                    const l = lines[i].toLowerCase();
+                    const score = words.filter(w => l.includes(w)).length;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestStart = i;
+                    }
+                }
+                if (bestStart < 0 || bestScore === 0) return [];
+                const out = [];
+                for (let i = bestStart + 1; i < lines.length && out.length < 2; i++) {
+                    const t = lines[i];
+                    const isPoint = /^(\d+[.)]|[-*•])\s+/.test(t);
+                    if (isPoint) {
+                        out.push(t.replace(/^(\d+[.)]|[-*•])\s*/, '').replace(/^(\d+[.)]|[-*•])\s*/, ''));
+                    } else if (out.length) {
+                        break;
+                    } else if (i - bestStart > 4) {
+                        break;
+                    }
+                }
+                return out;
+            };
+            let expEntries = parseEntryBlocks(fields.experience.value);
+            let expChanged = false;
+            expEntries = expEntries.map(e => {
+                if (e.bullets.length === 0) {
+                    const mb = masterBulletsFor(e.title);
+                    if (mb.length) {
+                        expChanged = true;
+                        return { title: e.title, meta: e.meta, bullets: mb };
+                    }
+                }
+                return e;
+            });
+            if (expChanged) {
+                fields.experience.value = expEntries.map(e => [e.title, e.meta, ...e.bullets.map(b => '- ' + b)].filter(Boolean).join('\n')).join('\n');
+                current.experience = fields.experience.value;
+                enforceCharLimit();
             }
 
             const masterLower = cvText.toLowerCase();
@@ -349,8 +402,7 @@ function enforceCharLimit() {
     const experienceMinBullets = () => {
         const lines = fields.experience.value.split('\n').filter(l => l.trim());
         const headers = lines.filter(l => !isBullet(l)).length;
-        const roles = Math.max(1, Math.round(headers / 2));
-        return 1 + roles;
+        return Math.max(1, Math.round(headers / 2));
     };
 
     let guard = 0;
@@ -377,11 +429,27 @@ function enforceCharLimit() {
         if (!target) break;
         const all = fields[target].value.split('\n').filter(l => l.trim());
         if (target === 'experience') {
-            let idx = -1;
+            const groups = {};
+            let lastHeader = -1;
             for (let i = 0; i < all.length; i++) {
-                if (isBullet(all[i])) idx = i;
+                if (isBullet(all[i])) {
+                    if (!groups[lastHeader]) groups[lastHeader] = [];
+                    groups[lastHeader].push(i);
+                } else {
+                    lastHeader = i;
+                }
             }
-            all.splice(idx, 1);
+            let bestLast = -1;
+            let bestCount = 1;
+            for (const h of Object.keys(groups)) {
+                const arr = groups[h];
+                if (arr.length > bestCount) {
+                    bestCount = arr.length;
+                    bestLast = arr[arr.length - 1];
+                }
+            }
+            if (bestLast < 0) break;
+            all.splice(bestLast, 1);
         } else {
             all.pop();
         }
