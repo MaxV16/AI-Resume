@@ -1230,7 +1230,7 @@ function formatCoverHtml(coverText, jobText) {
 }
 
 function escapeHtml(text) {
-    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 const PDF_CSS = `
@@ -1300,8 +1300,8 @@ function exportPdf(type) {
         bodyHtml = formatCvHtml(jobText);
         title = 'CV';
     } else {
-        const coverText = generateCoverLetter();
-        if (!coverText.trim()) {
+        const coverText = coverLetterText;
+        if (!coverText || !coverText.trim()) {
             alert('Nothing to export yet.');
             return;
         }
