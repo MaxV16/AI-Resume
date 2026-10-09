@@ -237,6 +237,9 @@ function chatContext() {
     const parts = ats.parts.map(p => `${p.label} ${p.points}/${p.max}`).join(', ');
     const iv = interviewData.map(d => d.question).slice(0, 8).join(' | ');
     const master = masterCv.value.trim();
+    const missingAll = jobText ? keywordCoverage(buildCvText(), jobText).missing : [];
+    const missingSupported = missingAll.filter(kw => keywordGroundedInMaster(kw, master)).slice(0, 10).join(', ') || '(none)';
+    const missingUnsupported = missingAll.filter(kw => !keywordGroundedInMaster(kw, master)).slice(0, 10).join(', ') || '(none)';
     return [
         `Master CV pasted by the user (the source of truth):\n${master ? master.slice(0, 5000) : '(none pasted)'}`,
         `Target job description:\n${jobText ? jobText.slice(0, 4000) : '(none provided)'}`,
@@ -249,6 +252,8 @@ function chatContext() {
         `Current cover letter:\n${coverLetterText || '(not generated yet)'}`,
         `Current ATS match: ${ats.score} percent. Breakdown: ${parts}.`,
         `Interview questions already prepared: ${iv || '(none yet)'}`,
+        `Job keywords still missing that the master CV DOES support (safe to add): ${missingSupported}`,
+        `Job keywords the master CV does NOT support (NEVER add these): ${missingUnsupported}`,
     ].join('\n\n');
 }
 
@@ -265,6 +270,8 @@ How to behave:
 - "coverLetter": put the full cover letter text here when the user asks you to write or change the cover letter, otherwise leave it "".
 - "action": "regenerateCover" to produce a fresh tailored cover letter, "generateInterview" to produce interview questions and STAR answers, or "none".
 - Work only from the master CV and current CV. Never invent employers, dates, degrees, metrics or responsibilities, and never add a technology the master CV does not mention or clearly imply. You may reorder, reword, tighten and re-emphasise.
+- The master CV is the single source of truth. Never change the degree name, institution, employer names, job titles, dates or the candidate's real technologies to satisfy a keyword. If a job keyword is not supported by the master CV, leave it out and say so; do not force it in.
+- Only add missing job keywords from the "safe to add" list in APP STATE, and only where the master CV already supports them. Never add anything from the "never add" list, and never claim you changed something you did not change.
 - Write experience bullets as action + what the work does, detects or prevents + method or tooling + outcome, without repeating the same claim twice.
 - Technical Skills are 4 to 5 bullet lines of technologies, languages and tools only, never sentences, job-relevant items first. Soft Skills are 3 short keyword-rich sentences with no near-duplicate ideas. Professional Experience keeps every role with at least one bullet, most relevant first.
 - Keep the whole CV within ${CHAR_LIMIT} characters.
@@ -407,6 +414,19 @@ async function sendChat() {
     appendChat('user', text);
     chatHistory.push({ role: 'user', content: text });
     chatInput.value = '';
+
+    if (/add.{0,25}(missing )?keyword|missing keyword|weave.{0,25}keyword/.test(text.toLowerCase())) {
+        const added = addGroundedKeywords();
+        enforceCharLimit();
+        updatePreview();
+        const msg = added
+            ? `Added ${added} supported keyword${added === 1 ? '' : 's'} from your master CV.`
+            : 'No additional keywords your master CV supports are missing.';
+        chatHistory.push({ role: 'assistant', content: msg });
+        appendChat('assistant', msg);
+        return;
+    }
+
     showLoading('Thinking...');
 
     let action = 'none';
@@ -452,6 +472,58 @@ async function sendChat() {
     } else if (action === 'regenerateCover') {
         generateCoverLetterAI(true);
     }
+}
+
+function addGroundedKeywords() {
+    const jobText = jobDesc.value.trim();
+    const masterLower = masterCv.value.trim().toLowerCase();
+    const softTerms = ['communication', 'teamwork', 'team player', 'collaborat', 'problem solving', 'problem-solving', 'time management', 'adaptab', 'leadership', 'mentor', 'stakeholder', 'customer', 'presentation', 'professional', 'organis', 'priorit', 'attention to detail', 'multitask', 'orientated', 'oriented', 'curios', 'enthusias', 'willingness', 'eager', 'initiative', 'proactive', 'dependab', 'reliab', 'interpersonal', 'empath', 'resilien', 'flexib', 'approachable', 'motivat', 'integrity', 'accountab', 'creativ', 'negotiat', 'analytical', 'troubleshoot'];
+    const cvNow = buildCvText().toLowerCase();
+    const stem = (w) => (w.length > 4 ? w.replace(/ies$/, 'y').replace(/s$/, '') : w);
+    const generic = new Set(['control', 'management', 'access', 'system', 'data', 'service', 'tool', 'network', 'platform', 'application', 'development', 'developer', 'design', 'testing', 'concept', 'awareness', 'basic', 'fundamental', 'version']);
+    const synonyms = { 'version control': ['git', 'github', 'bitbucket', 'svn'] };
+    let n = 0;
+    for (const kw of keywordCoverage(buildCvText(), jobText).missing) {
+        if (n >= 10) break;
+        if (cvNow.includes(kw)) continue;
+        if (!keywordGroundedInMaster(kw, masterCv.value)) continue;
+        const parts = kw.split(' ').filter(w => w.length >= 3);
+        const isEdu = /qualification|degree|third level|level \d/.test(kw);
+        const isSoft = softTerms.some(t => kw.includes(t));
+        if (isEdu) {
+            const cur = fields.education.value.trim();
+            if (!cur.toLowerCase().includes(kw)) {
+                fields.education.value = cur ? cur + '\n' + kw : kw;
+                n++;
+            }
+            continue;
+        }
+        if (isSoft) {
+            const softLines = fields.softSkills.value.split('\n').filter(l => l.trim());
+            if (softLines.length >= 4) continue;
+            const existing = fields.softSkills.value.toLowerCase();
+            if (parts.every(w => existing.includes(w))) continue;
+            fields.softSkills.value = fields.softSkills.value.trim() ? fields.softSkills.value.trim() + '\nSkilled in ' + kw + '.' : 'Skilled in ' + kw + '.';
+            n++;
+            continue;
+        }
+        const lines = fields.techSkills.value.split('\n').filter(l => l.trim());
+        const partsStem = parts.map(stem);
+        let matchIdx = -1;
+        for (let i = 0; i < lines.length; i++) {
+            const ll = lines[i].toLowerCase();
+            const lwStem = ll.split(/[^a-z0-9+#]+/).map(stem);
+            const strong = partsStem.some(p => !generic.has(p) && lwStem.includes(p));
+            const syn = (synonyms[kw] || []).some(s => ll.includes(s));
+            if (strong || syn) { matchIdx = i; break; }
+        }
+        if (matchIdx >= 0) {
+            lines[matchIdx] = lines[matchIdx].replace(/\s*$/, '') + ', ' + kw;
+            fields.techSkills.value = lines.join('\n');
+            n++;
+        }
+    }
+    return n;
 }
 
 async function parseCv() {
@@ -575,59 +647,9 @@ async function parseCv() {
                 enforceCharLimit();
             }
 
-            const masterLower = cvText.toLowerCase();
-            const softTerms = ['communication', 'teamwork', 'team player', 'collaborat', 'problem solving', 'problem-solving', 'time management', 'adaptab', 'leadership', 'mentor', 'stakeholder', 'customer', 'presentation', 'professional', 'organis', 'priorit', 'attention to detail', 'multitask', 'orientated', 'oriented', 'curios', 'enthusias', 'willingness', 'eager', 'initiative', 'proactive', 'dependab', 'reliab', 'interpersonal', 'empath', 'resilien', 'flexib', 'approachable', 'motivat', 'integrity', 'accountab', 'creativ', 'negotiat', 'analytical', 'troubleshoot'];
-            const addGrounded = () => {
-                const cvNow = buildCvText().toLowerCase();
-                const stem = (w) => (w.length > 4 ? w.replace(/ies$/, 'y').replace(/s$/, '') : w);
-                const generic = new Set(['control', 'management', 'access', 'system', 'data', 'service', 'tool', 'network', 'platform', 'application', 'development', 'developer', 'design', 'testing', 'concept', 'awareness', 'basic', 'fundamental', 'version']);
-                const synonyms = { 'version control': ['git', 'github', 'bitbucket', 'svn'] };
-                let n = 0;
-                for (const kw of keywordCoverage(buildCvText(), jobText).missing) {
-                    if (n >= 10) break;
-                    if (cvNow.includes(kw)) continue;
-                    const parts = kw.split(' ').filter(w => w.length >= 3);
-                    if (!parts.length || !parts.some(w => masterLower.includes(w) || masterLower.includes(stem(w)))) continue;
-                    const isEdu = /qualification|degree|third level|level \d/.test(kw);
-                    const isSoft = softTerms.some(t => kw.includes(t));
-                    if (isEdu) {
-                        const cur = fields.education.value.trim();
-                        if (!cur.toLowerCase().includes(kw)) {
-                            fields.education.value = cur ? cur + '\n' + kw : kw;
-                            n++;
-                        }
-                        continue;
-                    }
-                    if (isSoft) {
-                        const softLines = fields.softSkills.value.split('\n').filter(l => l.trim());
-                        if (softLines.length >= 4) continue;
-                        const existing = fields.softSkills.value.toLowerCase();
-                        if (parts.every(w => existing.includes(w))) continue;
-                        fields.softSkills.value = fields.softSkills.value.trim() ? fields.softSkills.value.trim() + '\nSkilled in ' + kw + '.' : 'Skilled in ' + kw + '.';
-                        n++;
-                        continue;
-                    }
-                    const lines = fields.techSkills.value.split('\n').filter(l => l.trim());
-                    const partsStem = parts.map(stem);
-                    let matchIdx = -1;
-                    for (let i = 0; i < lines.length; i++) {
-                        const ll = lines[i].toLowerCase();
-                        const lwStem = ll.split(/[^a-z0-9+#]+/).map(stem);
-                        const strong = partsStem.some(p => !generic.has(p) && lwStem.includes(p));
-                        const syn = (synonyms[kw] || []).some(s => ll.includes(s));
-                        if (strong || syn) { matchIdx = i; break; }
-                    }
-                    if (matchIdx >= 0) {
-                        lines[matchIdx] = lines[matchIdx].replace(/\s*$/, '') + ', ' + kw;
-                        fields.techSkills.value = lines.join('\n');
-                        n++;
-                    }
-                }
-                return n;
-            };
-            addGrounded();
+            addGroundedKeywords();
             enforceCharLimit();
-            addGrounded();
+            addGroundedKeywords();
             enforceCharLimit();
         }
 
@@ -847,6 +869,15 @@ function buildCvText() {
     return sections.filter(s => s).join('\n\n');
 }
 
+function keywordGroundedInMaster(kw, masterText) {
+    const lower = String(masterText || '').toLowerCase();
+    if (!lower) return false;
+    const stem = (w) => (w.length > 4 ? w.replace(/ies$/, 'y').replace(/s$/, '') : w);
+    const parts = kw.split(' ').filter(w => w.length >= 3);
+    if (!parts.length) return false;
+    return parts.every(w => lower.includes(w) || lower.includes(stem(w)));
+}
+
 function updatePreview() {
     const cvText = buildCvText();
     const jobText = jobDesc.value.trim();
@@ -882,8 +913,10 @@ function updatePreview() {
         pageWarning.style.display = 'none';
     }
 
-    const coverage = (jobText || activeKeywords) ? keywordCoverage(cvText, jobText) : { matched: 0, total: 0, missing: [] };
-    if (coverage.total && coverage.missing.length) {
+    const rawCoverage = (jobText || activeKeywords) ? keywordCoverage(cvText, jobText) : { matched: 0, total: 0, missing: [] };
+    const masterText = masterCv.value.trim();
+    const coverage = { matched: rawCoverage.matched, total: rawCoverage.total, missing: rawCoverage.missing.filter(kw => keywordGroundedInMaster(kw, masterText)) };
+    if (coverage.missing.length) {
         missingWarning.textContent = 'Keywords to add: ' + coverage.missing.slice(0, 6).join(', ');
         missingWarning.style.display = 'block';
     } else {

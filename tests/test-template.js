@@ -138,6 +138,8 @@ assert.ok(indexHtml.includes('interview-extra'), 'interview extras element missi
 assert.ok(appJs.includes('exportInterviewPdf') && appJs.includes('exportFlashcards'), 'interview export functions missing');
 assert.ok(indexHtml.includes('btn-export-flashcards') && indexHtml.includes('btn-export-interview'), 'interview export buttons missing');
 assert.ok(appJs.includes('answerBodyHtml'), 'interview answer body renderer missing');
+assert.ok(appJs.includes('keywordGroundedInMaster') && appJs.includes('addGroundedKeywords'), 'grounded keyword helpers missing');
+assert.ok(appJs.includes('NEVER add') || appJs.includes('never add'), 'chat must forbid unsupported keywords');
 
 // make sure the ai assistant chat exists
 assert.ok(appJs.includes('sendChat'), 'chat send handler missing');
