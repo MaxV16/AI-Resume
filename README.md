@@ -22,7 +22,7 @@ A dark-mode, single-page web app that uses the DeepSeek API to parse your master
 - Projects: the single most relevant project from your master CV, with 1 to 2 short bullets
 - LinkedIn and GitHub links in the exported CV header are clickable hyperlinks
 - Skills for Applications: dropdown of real skills (no sentences) to copy straight into an ATS or careers site
-- Interview Prep: generates "tell me about yourself", "why this company", role-specific STAR answers, questions to ask the interviewer, and open source talking points where relevant
+- Interview Prep: generates "tell me about yourself", "why this company", role-specific STAR answers, questions to ask the interviewer, and open source talking points where relevant, with bullet point or paragraph answers and export to a simple HTML flashcard deck or a Q&amp;A PDF
 - AI cover letter: generated automatically after Parse &amp; Auto-Fill, naming the company and role, with a **Regenerate Cover Letter** button
 - AI Assistant chat: talk to the AI in plain English and it answers questions, edits the CV fields directly, rewrites the cover letter, adds missing keywords, and generates interview questions, all with visibility of your CV, job description and ATS score
 - Export CV and cover letter as PDF
@@ -97,7 +97,7 @@ Open `index.html` in any modern browser. No build step, no server needed.
 
 9. Open **Skills for Applications**, pick a group, and copy the skills to paste into an ATS or careers site form.
 
-10. Open **Interview Prep**, choose bullet points or a paragraph, and click **Generate Questions** for "tell me about yourself", "why this company", role-specific questions with STAR answers, questions to ask the interviewer, and open source talking points.
+10. Open **Interview Prep**, choose bullet points or a paragraph, and click **Generate Questions** for "tell me about yourself", "why this company", role-specific questions with STAR answers, questions to ask the interviewer, and open source talking points. Use **Export Flashcards (HTML)** for a simple click-to-reveal deck or **Export Q&amp;A PDF** for a printable document.
 
 11. Use the **AI Assistant** box at the bottom to ask questions or request changes in plain English (for example "tighten my experience bullets" or "rewrite my cover letter for this company"). It can see your CV, job description, cover letter, ATS breakdown and interview data, and edits the CV fields directly.
 

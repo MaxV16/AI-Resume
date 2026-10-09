@@ -28,6 +28,8 @@ const btnGenerateInterview = document.getElementById('btn-generate-interview');
 const interviewQuestion = document.getElementById('interview-question');
 const interviewAnswer = document.getElementById('interview-answer');
 const interviewExtra = document.getElementById('interview-extra');
+const btnExportFlashcards = document.getElementById('btn-export-flashcards');
+const btnExportInterview = document.getElementById('btn-export-interview');
 const chatLog = document.getElementById('chat-log');
 const chatInput = document.getElementById('chat-input');
 const btnChatSend = document.getElementById('btn-chat-send');
@@ -161,6 +163,8 @@ function init() {
     btnGenerateInterview.addEventListener('click', generateInterviewQuestions);
     interviewFormat.addEventListener('change', renderInterviewAnswer);
     interviewQuestion.addEventListener('change', renderInterviewAnswer);
+    btnExportFlashcards.addEventListener('click', exportFlashcards);
+    btnExportInterview.addEventListener('click', exportInterviewPdf);
 
     btnChatSend.addEventListener('click', sendChat);
     chatInput.addEventListener('keydown', (e) => {
@@ -1702,6 +1706,37 @@ Return JSON in this shape:
         });
 }
 
+function starParts(item) {
+    return [
+        ['Situation', item.situation],
+        ['Task', item.task],
+        ['Action', item.action],
+        ['Result', item.result],
+    ].filter(s => s[1]);
+}
+
+function answerBodyHtml(item) {
+    const fmt = interviewFormat.value;
+    if (item.paragraph) {
+        if (fmt === 'bullets') {
+            const sentences = String(item.paragraph).split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+            return `<ul>${sentences.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>`;
+        }
+        return `<p>${escapeHtml(String(item.paragraph))}</p>`;
+    }
+    const star = starParts(item);
+    if (!star.length) {
+        if (item.answer) return `<p>${escapeHtml(String(item.answer))}</p>`;
+        return '';
+    }
+    if (fmt === 'paragraph') {
+        const body = star.map(s => `<span class="star-label">${s[0]}:</span> ${escapeHtml(String(s[1]))}`).join(' ');
+        return `<p>${body}</p>`;
+    }
+    const list = star.map(s => `<li><span class="star-label">${s[0]}:</span> ${escapeHtml(String(s[1]))}</li>`).join('');
+    return `<ul>${list}</ul>`;
+}
+
 function renderInterviewAnswer() {
     const idx = parseInt(interviewQuestion.value, 10);
     const item = interviewData[idx];
@@ -1709,28 +1744,93 @@ function renderInterviewAnswer() {
         interviewAnswer.textContent = 'Paste a job description, then generate to see tailored questions and STAR answers.';
         return;
     }
+    interviewAnswer.innerHTML = `<p class="q">${escapeHtml(item.question || '')}</p>${answerBodyHtml(item)}`;
+}
 
-    const question = escapeHtml(item.question || '');
+function interviewExtrasHtml() {
+    let html = '';
+    if (interviewAsk.length) {
+        html += `<h2>Questions to ask the interviewer</h2><ul>${interviewAsk.map(q => `<li>${escapeHtml(String(q))}</li>`).join('')}</ul>`;
+    }
+    if (interviewOpen.length) {
+        html += `<h2>Open source</h2><ul>${interviewOpen.map(q => `<li>${escapeHtml(String(q))}</li>`).join('')}</ul>`;
+    }
+    return html;
+}
 
-    if (item.paragraph) {
-        interviewAnswer.innerHTML = `<p class="q">${question}</p><p>${escapeHtml(String(item.paragraph))}</p>`;
+function interviewNamePart() {
+    const parsedContact = parseContact(fields.contact.value);
+    const name = (parsedContact.name || '').replace(/[^a-zA-Z]/g, '');
+    return name ? name + 'Interview' : 'Interview';
+}
+
+function downloadFile(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+function exportInterviewPdf() {
+    if (!interviewData.length) {
+        alert('Generate interview questions first.');
         return;
     }
+    const blocks = interviewData.map(item => `<h2>${escapeHtml(item.question || '')}</h2>${answerBodyHtml(item)}`).join('');
+    const extras = interviewExtrasHtml();
+    const extraCss = '.interview-export h2 { margin: 12pt 0 3pt; padding-bottom: 1.5pt; border-bottom: 1.2pt solid #000; } .interview-export .star-label { font-weight: 700; }';
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${interviewNamePart()}</title><style>${PDF_CSS}${extraCss}</style></head><body class="interview-export">${blocks}${extras}</body></html>`;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+        win.print();
+    }, 300);
+}
 
-    const star = [
-        ['Situation', item.situation],
-        ['Task', item.task],
-        ['Action', item.action],
-        ['Result', item.result],
-    ];
-
-    if (interviewFormat.value === 'paragraph') {
-        const body = star.filter(s => s[1]).map(s => `<span class="star-label">${s[0]}:</span> ${escapeHtml(String(s[1]))}`).join(' ');
-        interviewAnswer.innerHTML = `<p class="q">${question}</p><p>${body}</p>`;
-    } else {
-        const list = star.filter(s => s[1]).map(s => `<li><span class="star-label">${s[0]}:</span> ${escapeHtml(String(s[1]))}</li>`).join('');
-        interviewAnswer.innerHTML = `<p class="q">${question}</p><ul>${list}</ul>`;
+function exportFlashcards() {
+    if (!interviewData.length) {
+        alert('Generate interview questions first.');
+        return;
     }
+    const cards = interviewData.map(item => {
+        const q = escapeHtml(item.question || '');
+        return `<div class="card" onclick="this.classList.toggle('open')"><div class="q">${q}</div><div class="a">${answerBodyHtml(item)}</div></div>`;
+    }).join('');
+    const extras = interviewExtrasHtml();
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${interviewNamePart()} Flashcards</title>
+<style>
+body { margin: 0; padding: 24px; background: #0f1117; color: #e5e7eb; font-family: 'Segoe UI', Lato, Arial, sans-serif; }
+h1 { font-size: 1.2rem; margin: 0 0 16px; }
+.card { background: #1a1d27; border: 1px solid #2a2f3d; border-radius: 10px; padding: 16px; margin-bottom: 12px; cursor: pointer; }
+.card .q { font-weight: 700; }
+.card .a { display: none; margin-top: 10px; line-height: 1.5; color: #cbd5e1; }
+.card.open .a { display: block; }
+.card ul { margin: 0; padding-left: 18px; }
+.card li { margin-bottom: 4px; }
+.card .star-label { font-weight: 700; color: #818cf8; }
+h2 { font-size: 1rem; margin: 22px 0 8px; }
+ul { line-height: 1.5; }
+</style>
+</head>
+<body>
+<h1>Interview Flashcards (click a card to reveal)</h1>
+${cards}
+${extras}
+</body>
+</html>`;
+    downloadFile(interviewNamePart() + 'Flashcards.html', html, 'text/html');
 }
 
 function renderInterviewExtra() {

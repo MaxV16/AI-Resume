@@ -135,6 +135,9 @@ assert.ok(indexHtml.includes('btn-generate-interview'), 'generate interview butt
 assert.ok(indexHtml.includes('interview-format'), 'interview format select missing');
 assert.ok(indexHtml.includes('interview-answer'), 'interview answer element missing');
 assert.ok(indexHtml.includes('interview-extra'), 'interview extras element missing');
+assert.ok(appJs.includes('exportInterviewPdf') && appJs.includes('exportFlashcards'), 'interview export functions missing');
+assert.ok(indexHtml.includes('btn-export-flashcards') && indexHtml.includes('btn-export-interview'), 'interview export buttons missing');
+assert.ok(appJs.includes('answerBodyHtml'), 'interview answer body renderer missing');
 
 // make sure the ai assistant chat exists
 assert.ok(appJs.includes('sendChat'), 'chat send handler missing');
