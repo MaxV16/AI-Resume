@@ -105,6 +105,13 @@ assert.ok(appJs.includes('Keyword Match'), 'keyword match bucket missing');
 assert.ok(appJs.includes('Job Title Match'), 'job title match bucket missing');
 assert.ok(appJs.includes('Quantified Impact'), 'quantified impact bucket missing');
 assert.ok(appJs.includes('Structure & Contact'), 'structure and contact bucket missing');
+
+// role-general behaviour
+assert.ok(appJs.includes('adapt the labels to the profession'), 'skills prompt should be role-general');
+assert.ok(/marketer|marketing/.test(appJs), 'job title extraction should cover non-technical roles');
+assert.ok(!appJs.includes("'sustainability', 'sustainable', 'planet'"), 'domain words should not be filtered out of keywords');
+assert.ok(appJs.includes('standard professional terms for that kind of work'), 'correction pass should be role-general');
+assert.ok(appJs.includes('activeJobTitle'), 'title-derived role phrase scrubbing missing');
 assert.ok(indexHtml.includes('ats-breakdown'), 'ats breakdown element missing');
 assert.ok(!indexHtml.includes('btn-tailor'), 'tailor button should be removed');
 assert.ok(!appJs.includes('tailorToJd'), 'tailor to jd should be removed');
