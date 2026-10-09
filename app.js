@@ -260,8 +260,9 @@ How to behave:
 - "reply" is your plain-language answer or a one-line summary of what you changed. Always present.
 - "coverLetter": put the full cover letter text here when the user asks you to write or change the cover letter, otherwise leave it "".
 - "action": "regenerateCover" to produce a fresh tailored cover letter, "generateInterview" to produce interview questions and STAR answers, or "none".
-- Work only from the master CV and current CV. Never invent employers, dates, degrees, metrics or responsibilities. You may reorder, reword, tighten and re-emphasise.
-- Technical Skills are 4 to 5 bullet lines of technologies, languages and tools only, never sentences. Soft Skills are 3 short keyword-rich sentences. Professional Experience keeps every role with at least one bullet, most recent first.
+- Work only from the master CV and current CV. Never invent employers, dates, degrees, metrics or responsibilities, and never add a technology the master CV does not mention or clearly imply. You may reorder, reword, tighten and re-emphasise.
+- Write experience bullets as action + what the work does, detects or prevents + method or tooling + outcome, without repeating the same claim twice.
+- Technical Skills are 4 to 5 bullet lines of technologies, languages and tools only, never sentences, job-relevant items first. Soft Skills are 3 short keyword-rich sentences with no near-duplicate ideas. Professional Experience keeps every role with at least one bullet, most relevant first.
 - Keep the whole CV within ${CHAR_LIMIT} characters.
 - Never use em dashes; use hyphens or commas instead.
 - Be concise and practical.
@@ -591,11 +592,12 @@ async function parseCv() {
                         continue;
                     }
                     if (isSoft) {
-                        const cur = fields.softSkills.value.trim();
-                        if (!cur.toLowerCase().includes(kw)) {
-                            fields.softSkills.value = cur ? cur + '\nSkilled in ' + kw + '.' : 'Skilled in ' + kw + '.';
-                            n++;
-                        }
+                        const softLines = fields.softSkills.value.split('\n').filter(l => l.trim());
+                        if (softLines.length >= 4) continue;
+                        const existing = fields.softSkills.value.toLowerCase();
+                        if (parts.every(w => existing.includes(w))) continue;
+                        fields.softSkills.value = fields.softSkills.value.trim() ? fields.softSkills.value.trim() + '\nSkilled in ' + kw + '.' : 'Skilled in ' + kw + '.';
+                        n++;
                         continue;
                     }
                     const lines = fields.techSkills.value.split('\n').filter(l => l.trim());
@@ -725,21 +727,23 @@ RULES:
 - Target the full character budget: aim for 2700 to ${CHAR_LIMIT} characters so the CV fills one A4 page. Only go shorter if the source CV genuinely has little content. Never exceed ${CHAR_LIMIT} characters.
 - There is NO profile, summary, objective or achievements section. Fold the strongest supporting detail from the master CV into the experience, project and skills bullets, and omit anything that does not fit.
 - Never leave a section a single bare line. A near-empty Projects or Skills section is a failure.
-- PROFESSIONAL EXPERIENCE is the centrepiece of the CV and carries the most weight. Include EVERY role from the master CV, most recent first. Rank roles by relevance to the job: give the most relevant or most recent role 4 to 6 bullets, each other clearly relevant role 2 to 3 bullets, and a partly relevant role a compact entry of 1 to 2 bullets. Never drop a role and never let a less relevant role grow large. Every role must have at least one bullet: never output a role with no bullets underneath it.
-- Write every experience bullet as ACTION + SCOPE or CONTEXT + METHOD or TOOLING + OUTCOME, in one or two lines. Lead with a strong action verb. Quantify the outcome only with figures the master CV actually contains; when no figure exists, describe the concrete qualitative impact instead. Never invent metrics, employers, dates, degrees or responsibilities.
-- TECHNICAL SKILLS: output 4 to 5 bullet lines. Each line is technologies, languages, tools or a short category label followed by comma-separated tech, for example Cloud & DevOps: AWS, Docker, Kubernetes. Never write a sentence, trait or soft skill here. Prioritise the skills the target job asks for; you may keep a few strong general skills the candidate clearly has, but omit unrelated ones. Do not add any line that is not a technology, language or tool.
-- SOFT SKILLS: output 3 bullet lines. Each line is a single short sentence of roughly 8 to 14 words that names the skill and includes the relevant job keywords.
-- PROJECTS: choose the single most relevant project from the master CV for this job. Output its name plus tech stack on the first line, then 1 to 2 short bullets, one short sentence each, covering what the project does and the relevant outcome.
-- Use strong action verbs (built, developed, led, automated, optimized, etc.). Lead every bullet with an action verb and, where the master CV supports a number, a measurable outcome.
-- Quantify achievements where possible (%, numbers, time saved).
-- ATS-friendly: standard headings, no tables, no graphics, no columns, plain text only.
-- When a job description is provided, tailor the CV to it: reorder and rephrase so the candidate's real experience maps onto what the employer asks for, mirror their exact wording where it truthfully applies, and surface the most relevant material in the top third of the page. The job description shapes emphasis and ordering; it must never crowd out or replace the candidate's actual content.
-- Place each important keyword in BOTH the relevant skills line AND at least one dated experience or project bullet, because ATS systems reward keywords proven in context, not only listed.
-- Never repeat a keyword more than about four times: keyword stuffing is penalised.
-- Include EVERY relevant role and skill from the source CV. Never drop experience that relates to the target job.
-- Optimise for a human recruiter too: make every bullet specific, achievement-focused and easy to scan. No generic filler such as hardworking, team player or good communicator.
-- In the EDUCATION section list at most six relevant modules, choosing the ones most relevant to the job description.
-- Extract and structure the CV data.
+    - PROFESSIONAL EXPERIENCE is the centrepiece of the CV and carries the most weight. Include EVERY role from the master CV and rank them by relevance to the job, most relevant first and then most recent: give the most relevant or most recent role 4 to 6 bullets, each other clearly relevant role 2 to 3 bullets, and a partly relevant role a compact 1 to 2 bullets. Never drop a role, never let a less relevant role grow large, and never output a role with no bullets underneath it.
+    - Write every experience bullet as ACTION + WHAT IT DOES, DETECTS OR PREVENTS + METHOD OR TOOLING + OUTCOME, in one or two lines. Lead with a strong action verb. State concretely what the work detects, fixes or improves, and how findings are validated (for example validating findings with a security tool), not just the task. Do not restate the same claim twice across bullets or sections. Quantify only with figures the master CV actually contains; otherwise describe the concrete qualitative impact. Never invent metrics, employers, dates, degrees or responsibilities.
+    - TECHNICAL SKILLS: output 4 to 5 bullet lines. Each line is technologies, languages, tools or a short category label followed by comma-separated names, for example Identity & Access Management: AWS IAM, Identity Center, Active Directory. Put the categories and items the job asks for first (for a security or cloud role, Identity & Access Management first). Use concrete skills only, never repeat an item across lines, and never pad with generic or duplicated phrases. Never write a sentence, trait or soft skill here. Do not add any technology the master CV does not mention or clearly imply.
+    - SOFT SKILLS: output exactly 3 bullet lines. Each line is a single evidence-based sentence of roughly 8 to 14 words that names the skill and naturally includes the relevant job keywords. Never repeat or near-duplicate an idea, and never output a bare phrase.
+    - PROJECTS: choose the single most relevant project from the master CV for this job. Output its name plus tech stack on the first line, then 1 to 2 short bullets, one short sentence each, covering what the project does and the relevant outcome. Only list technologies the project actually uses.
+    - Use strong action verbs (built, developed, led, automated, optimized, etc.). Lead every bullet with an action verb and, where the master CV supports a number, a measurable outcome.
+    - Quantify achievements where possible (%, numbers, time saved), but never invent a figure.
+    - ATS-friendly: standard headings, no tables, no graphics, no columns, plain text only.
+    - Prioritise the must-have requirements of the job: the job title, the requirements or qualifications bullets, and the first responsibilities. Mirror their exact wording where the candidate's experience truthfully supports it, and lead the CV with the strongest matching evidence. When a job description is provided, tailor the CV to it: reorder and rephrase so the candidate's real experience maps onto what the employer asks for, and surface the most relevant material in the top third of the page. The job description shapes emphasis and ordering; it must never crowd out or replace the candidate's actual content.
+    - Never add technologies, tools or responsibilities the master CV does not mention or clearly imply. Relevance and truthfulness matter more than keyword count.
+    - Place each important keyword in BOTH the relevant skills line AND at least one dated experience or project bullet, because ATS systems reward keywords proven in context, not only listed.
+    - Never repeat a keyword more than about four times: keyword stuffing is penalised.
+    - Include EVERY relevant role and skill from the source CV. Never drop experience that relates to the target job.
+    - Optimise for a human recruiter too: make every bullet specific, achievement-focused and easy to scan. No generic filler such as hardworking, team player or good communicator.
+    - In the EDUCATION section list at most six relevant modules, choosing the ones most relevant to the job description. For a student or recent graduate, always state the expected graduation date and keep it easy to find.
+    - Extract and structure the CV data.
+
 
 OUTPUT FORMAT (JSON):
 {
@@ -748,8 +752,8 @@ OUTPUT FORMAT (JSON):
     "keywords": ["15 to 25 of the most important ATS keywords from the job description, most important first. Each keyword must be short: 1 to 3 words, never a full sentence or clause. Mix the employer's exact wording with standard synonyms. Only terms the candidate genuinely has or can honestly claim."],
     "contact": "FULL NAME\\nPhone | Email\\nLocation\\nLinkedIn: url | GitHub: url",
     "education": "Degree, Institution\\nYears, Location\\n- Grade: ...\\n- Relevant Modules: ...\\n- Activities: ...",
-    "techSkills": "4 to 5 bullet lines of technologies, languages and tools only, e.g. Cloud & DevOps: AWS, Docker, Kubernetes\\nNetworking: TCP/IP, DNS, VPNs",
-    "softSkills": "3 bullet lines, each a short sentence of roughly 8 to 14 words, e.g. Strong communication skills built through cross-team collaboration.",
+    "techSkills": "4 to 5 bullet lines of technologies, languages and tools only, job-relevant first, e.g. Identity & Access Management: AWS IAM, Identity Center, Active Directory\\nCloud & DevOps: AWS, Docker, Kubernetes",
+    "softSkills": "exactly 3 bullet lines, each a short evidence-based sentence of roughly 8 to 14 words with the job keywords woven in, e.g. Strong troubleshooting skills proven resolving access issues through to resolution.",
     "experience": "Job Title, Company\\nDates, Location\\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n- Bullet 4",
     "projects": "Most relevant Project Name (Tech Stack)\\n- One short sentence on what it does and its outcome\\n- One short sentence on the key feature or impact"
 }`;

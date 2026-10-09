@@ -151,6 +151,13 @@ assert.ok(indexHtml.includes('chat-input'), 'chat input missing');
 assert.ok(indexHtml.includes('btn-chat-send'), 'chat send button missing');
 assert.ok(indexHtml.includes('data-chat'), 'chat quick prompts missing');
 
+// make sure the gptoracle-style evidence-first logic is baked in
+assert.ok(appJs.includes('WHAT IT DOES, DETECTS OR PREVENTS'), 'evidence-first bullet rule missing');
+assert.ok(appJs.includes('must-have requirements of the job'), 'must-have prioritisation rule missing');
+assert.ok(appJs.includes('does not mention or clearly imply'), 'truthful tailoring rule missing');
+assert.ok(appJs.includes('expected graduation date'), 'graduation date rule missing');
+assert.ok(appJs.includes('near-duplicate'), 'soft skill dedupe rule missing');
+
 // make sure removed features are gone
 assert.ok(!appJs.includes('parsePlatformData'), 'platform import should be removed');
 assert.ok(!appJs.includes('platformSelect'), 'platform dropdown wiring should be removed');
