@@ -579,12 +579,15 @@ async function parseCv() {
             const softTerms = ['communication', 'teamwork', 'team player', 'collaborat', 'problem solving', 'problem-solving', 'time management', 'adaptab', 'leadership', 'mentor', 'stakeholder', 'customer', 'presentation', 'professional', 'organis', 'priorit', 'attention to detail', 'multitask', 'orientated', 'oriented', 'curios', 'enthusias', 'willingness', 'eager', 'initiative', 'proactive', 'dependab', 'reliab', 'interpersonal', 'empath', 'resilien', 'flexib', 'approachable', 'motivat', 'integrity', 'accountab', 'creativ', 'negotiat', 'analytical', 'troubleshoot'];
             const addGrounded = () => {
                 const cvNow = buildCvText().toLowerCase();
+                const stem = (w) => (w.length > 4 ? w.replace(/ies$/, 'y').replace(/s$/, '') : w);
+                const generic = new Set(['control', 'management', 'access', 'system', 'data', 'service', 'tool', 'network', 'platform', 'application', 'development', 'developer', 'design', 'testing', 'concept', 'awareness', 'basic', 'fundamental', 'version']);
+                const synonyms = { 'version control': ['git', 'github', 'bitbucket', 'svn'] };
                 let n = 0;
                 for (const kw of keywordCoverage(buildCvText(), jobText).missing) {
                     if (n >= 10) break;
                     if (cvNow.includes(kw)) continue;
                     const parts = kw.split(' ').filter(w => w.length >= 3);
-                    if (!parts.length || !parts.some(w => masterLower.includes(w))) continue;
+                    if (!parts.length || !parts.some(w => masterLower.includes(w) || masterLower.includes(stem(w)))) continue;
                     const isEdu = /qualification|degree|third level|level \d/.test(kw);
                     const isSoft = softTerms.some(t => kw.includes(t));
                     if (isEdu) {
@@ -605,7 +608,15 @@ async function parseCv() {
                         continue;
                     }
                     const lines = fields.techSkills.value.split('\n').filter(l => l.trim());
-                    const matchIdx = lines.findIndex(l => l.toLowerCase().split(/[^a-z0-9]+/).some(w => w.length >= 4 && parts.includes(w)));
+                    const partsStem = parts.map(stem);
+                    let matchIdx = -1;
+                    for (let i = 0; i < lines.length; i++) {
+                        const ll = lines[i].toLowerCase();
+                        const lwStem = ll.split(/[^a-z0-9+#]+/).map(stem);
+                        const strong = partsStem.some(p => !generic.has(p) && lwStem.includes(p));
+                        const syn = (synonyms[kw] || []).some(s => ll.includes(s));
+                        if (strong || syn) { matchIdx = i; break; }
+                    }
                     if (matchIdx >= 0) {
                         lines[matchIdx] = lines[matchIdx].replace(/\s*$/, '') + ', ' + kw;
                         fields.techSkills.value = lines.join('\n');
