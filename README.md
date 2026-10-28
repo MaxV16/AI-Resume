@@ -1,5 +1,7 @@
 # AI Resume Builder
 
+**Live app (free, no install):** https://maxv16.github.io/AI-Resume/ · [![Deploy](https://img.shields.io/badge/hosted-GitHub%20Pages-blue)](https://maxv16.github.io/AI-Resume/)
+
 A dark-mode, single-page web app that uses the DeepSeek API to parse your master CV, auto-fill a strict template, and generate an ATS-optimized CV and cover letter. Export both as PDF.
 
 ## Features
